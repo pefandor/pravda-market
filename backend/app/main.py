@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from app.db.session import get_db, init_db
 from app.db.models import Market
+from app.api.routes import users
 
 # Создаем FastAPI приложение
 app = FastAPI(
@@ -39,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Подключение роутеров
+app.include_router(users.router)
 
 
 @app.get("/")
