@@ -1,27 +1,45 @@
 """
 Database Session Management
 
-Настройка SQLAlchemy для работы с SQLite
+Настройка SQLAlchemy для работы с SQLite или PostgreSQL
 """
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
+from dotenv import load_dotenv
 from app.core.logging_config import get_logger
+
+# Load environment variables
+load_dotenv()
 
 logger = get_logger()
 
-# SQLite database file path
-DATABASE_FILE = "pravda_market.db"
-DATABASE_URL = f"sqlite:///./{DATABASE_FILE}"
+# Get database URL from environment or use SQLite as fallback
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pravda_market.db")
 
-# Create engine
-# check_same_thread=False нужен для SQLite с FastAPI
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    echo=False,  # True для debug SQL queries
-)
+# Determine if using SQLite
+is_sqlite = DATABASE_URL.startswith("sqlite")
+
+# Create engine with appropriate settings
+if is_sqlite:
+    # SQLite-specific settings
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        echo=False
+    )
+    logger.info(f"Using SQLite database: {DATABASE_URL}")
+else:
+    # PostgreSQL settings
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        echo=False
+    )
+    logger.info("Using PostgreSQL database")
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

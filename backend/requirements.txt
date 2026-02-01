@@ -26,3 +26,6 @@ slowapi==0.1.9
 # Type Checking
 mypy==1.13.0
 types-python-dotenv==1.0.0.20240331
+
+# PostgreSQL
+psycopg2-binary==2.9.10

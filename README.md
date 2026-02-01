@@ -88,8 +88,28 @@ pip install -r requirements.txt
 cp .env.example .env
 # Отредактировать .env с вашими credentials
 
+# Инициализировать базу данных
+python -c "from app.db.session import init_db; from app.core.logging_config import setup_logging; setup_logging(); init_db()"
+
+# Seed тестовый баланс (опционально)
+python -m app.db.seed
+
 # Запустить сервер
 uvicorn app.main:app --reload
+```
+
+#### Database Configuration
+
+**SQLite (Development - по умолчанию):**
+```bash
+DATABASE_URL=sqlite:///./pravda_market.db
+```
+
+**PostgreSQL (Production/Testing):**
+```bash
+# Install PostgreSQL: https://www.postgresql.org/download/
+createdb pravda_market
+DATABASE_URL=postgresql://username:password@localhost:5432/pravda_market
 ```
 
 ### Frontend Setup

@@ -5,6 +5,7 @@ Shared test fixtures for backend testing
 """
 
 import pytest
+import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
@@ -12,21 +13,36 @@ from fastapi.testclient import TestClient
 from app.db.models import Base, User
 from app.core.security import create_mock_init_data
 
-# Create test database engine at module level
-# Use file-based database for better compatibility with FastAPI TestClient
-TEST_DATABASE_URL = "sqlite:///./test_pravda_market.db"
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={
-        "check_same_thread": False,
-        "timeout": 30  # Increase timeout for database locks
-    }
+# Get test database URL from environment or use SQLite as fallback
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "sqlite:///./test_pravda_market.db"
 )
 
-# Enable WAL mode for better concurrency
-with test_engine.connect() as conn:
-    conn.execute(text("PRAGMA journal_mode=WAL"))
-    conn.commit()
+# Determine if using SQLite
+is_sqlite = TEST_DATABASE_URL.startswith("sqlite")
+
+# Create test database engine
+if is_sqlite:
+    test_engine = create_engine(
+        TEST_DATABASE_URL,
+        connect_args={
+            "check_same_thread": False,
+            "timeout": 30
+        }
+    )
+    # Enable WAL mode for better concurrency (SQLite only)
+    with test_engine.connect() as conn:
+        conn.execute(text("PRAGMA journal_mode=WAL"))
+        conn.commit()
+else:
+    # PostgreSQL settings
+    test_engine = create_engine(
+        TEST_DATABASE_URL,
+        pool_size=5,
+        max_overflow=10,
+        pool_pre_ping=True
+    )
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 

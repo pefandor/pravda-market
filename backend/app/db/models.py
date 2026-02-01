@@ -122,6 +122,8 @@ class Order(Base):
         CheckConstraint('amount_kopecks > 0', name='positive_amount'),
         CheckConstraint("side IN ('yes', 'no')", name='valid_side'),
         CheckConstraint("status IN ('open', 'partial', 'filled', 'cancelled')", name='valid_status'),
+        # Composite index for matching engine performance
+        Index('idx_orders_matching', 'market_id', 'side', 'price_bp', 'created_at'),
     )
 
     def __repr__(self):
