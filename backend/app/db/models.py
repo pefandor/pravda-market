@@ -167,7 +167,60 @@ class LedgerEntry(Base):
         return f"<LedgerEntry(id={self.id}, user_id={self.user_id}, type={self.type}, amount={self.amount_kopecks/100:.2f}₽)>"
 
 
+class Trade(Base):
+    """
+    Исполненная сделка между YES и NO ордерами
+
+    Каждый Trade представляет matched сделку:
+    - YES order @ price_bp
+    - NO order @ (10000 - price_bp)
+    - Settlement: yes_cost + no_cost = amount_kopecks (INVARIANT!)
+    """
+    __tablename__ = "trades"
+
+    id = Column(Integer, primary_key=True, index=True)
+    market_id = Column(Integer, ForeignKey("markets.id"), nullable=False, index=True)
+
+    # Ордера участники сделки
+    yes_order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    no_order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+
+    # Детали сделки
+    price_bp = Column(Integer, nullable=False)  # YES price in basis points
+    amount_kopecks = Column(BigInteger, nullable=False)  # Matched amount
+
+    # Settlement amounts (CRITICAL: must sum to amount_kopecks)
+    yes_cost_kopecks = Column(BigInteger, nullable=False)  # YES pays this
+    no_cost_kopecks = Column(BigInteger, nullable=False)   # NO pays this
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Constraints (CRITICAL - data integrity + settlement invariant)
+    __table_args__ = (
+        CheckConstraint('price_bp >= 0 AND price_bp <= 10000', name='trade_valid_price'),
+        CheckConstraint('amount_kopecks > 0', name='trade_positive_amount'),
+        CheckConstraint('yes_cost_kopecks >= 0', name='trade_positive_yes_cost'),
+        CheckConstraint('no_cost_kopecks >= 0', name='trade_positive_no_cost'),
+        # CRITICAL: Settlement invariant at database level!
+        CheckConstraint('yes_cost_kopecks + no_cost_kopecks = amount_kopecks', name='trade_settlement_invariant'),
+        # Composite index for trade history queries
+        Index('idx_trades_market_created', 'market_id', 'created_at'),
+    )
+
+    def __repr__(self):
+        return f"<Trade(id={self.id}, market_id={self.market_id}, amount={self.amount_rubles:.2f}₽, price={self.price_decimal:.2%})>"
+
+    @property
+    def price_decimal(self) -> float:
+        """Цена в десятичном формате (0.0 - 1.0)"""
+        return self.price_bp / 10000
+
+    @property
+    def amount_rubles(self) -> float:
+        """Сумма в рублях"""
+        return self.amount_kopecks / 100
+
+
 # В будущем добавим:
-# - Trade (исполненные сделки)
 # - PaymentRequest (платежи)
 # - OrderEvent (audit trail)

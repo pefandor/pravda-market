@@ -14,6 +14,8 @@ from app.db.session import get_db
 from app.db.models import User, Order, LedgerEntry, Market
 from app.api.deps import get_current_user
 from app.services.balance import get_available_balance, has_sufficient_balance, get_user_balance
+from app.services.matching import match_order
+from app.services.validation import validate_order_size
 from app.core.logging_config import get_logger
 from app.core.rate_limit import limiter
 
@@ -77,7 +79,18 @@ def place_bet(
     amount_kopecks = int(bet.amount * 100)
     price_bp = int(bet.price * 10000)
 
-    # 3. Check balance
+    # 3. SECURITY: Validate order size (DOS protection)
+    try:
+        validate_order_size(amount_kopecks)
+    except ValueError as e:
+        logger.warning("Order size validation failed", extra={
+            "user_id": user.id,
+            "amount_kopecks": amount_kopecks,
+            "error": str(e)
+        })
+        raise HTTPException(400, str(e))
+
+    # 4. Check balance
     if not has_sufficient_balance(user.id, amount_kopecks, db):
         available = get_available_balance(user.id, db)
         logger.warning("Insufficient balance", extra={
@@ -108,23 +121,40 @@ def place_bet(
             reference_id=order.id
         )
         db.add(lock_entry)
+        db.flush()
 
+        # 6. NEW: Attempt matching (SLICE #4)
+        trades = match_order(order, db)
+
+        # 7. CRITICAL: Commit ALL changes atomically
         db.commit()
         db.refresh(order)
 
-        logger.info("Order created", extra={
+        logger.info("Order created and matched", extra={
             "order_id": order.id,
             "user_id": user.id,
             "market_id": bet.market_id,
             "side": bet.side,
             "price": bet.price,
-            "amount": bet.amount
+            "amount": bet.amount,
+            "status": order.status,
+            "filled": order.filled_kopecks / 100,
+            "trades_count": len(trades)
         })
 
         return {
             "success": True,
             "order_id": order.id,
-            "status": order.status
+            "status": order.status,
+            "filled": order.filled_kopecks / 100,  # Return in rubles
+            "trades": [
+                {
+                    "trade_id": t.id,
+                    "amount": t.amount_kopecks / 100,
+                    "price": t.price_bp / 10000
+                }
+                for t in trades
+            ]
         }
 
     except Exception as e:
@@ -196,11 +226,13 @@ def get_balance(
     available = get_available_balance(user.id, db)  # Same as total in current implementation
 
     # Calculate locked separately for display
-    # Sum both order_lock (negative) and order_unlock (positive) entries
+    # Sum all lock/unlock entries (order_lock, order_unlock, trade_lock)
+    # Locked = |negative sum| (locks are negative, unlocks are positive)
     locked = db.query(func.sum(LedgerEntry.amount_kopecks)).filter(
         LedgerEntry.user_id == user.id,
-        LedgerEntry.type.in_(['order_lock', 'order_unlock'])
+        LedgerEntry.type.in_(['order_lock', 'order_unlock', 'trade_lock'])
     ).scalar()
+    # locked is negative (e.g., -6500), so abs() gives locked amount
     locked_amount = abs(locked) if locked else 0
 
     return {
