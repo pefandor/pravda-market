@@ -865,10 +865,371 @@ async def send_alert(message: str, severity: str = 'warning'):
 - ✅ Полное тестирование
 - ✅ Monitoring & observability
 - 📅 **Timeline: 2 недели → 3-4 недели** (реалистично)
+- 🎯 **ПОДХОД: Vertical Slices вместо Big Bang** (v2.1)
 
 ---
 
-### ✅ WEEK 1: FOUNDATION
+## 🎯 МЕТОДОЛОГИЯ: VERTICAL SLICES APPROACH (v2.1 - CRITICAL UPDATE)
+
+### ❌ Проблема с "Big Bang" подходом:
+
+```
+Типичный подход (НЕПРАВИЛЬНО):
+1. Setup всего сразу (frontend + backend)
+2. Написать весь database schema
+3. Написать весь matching engine
+4. Написать все API endpoints
+5. Написать весь frontend
+6. Потом тестировать
+7. 😱 Обнаружить архитектурные проблемы в конце
+8. 😱 Переделывать все
+```
+
+**Почему плохо:**
+- ❌ Проблемы обнаруживаются поздно
+- ❌ Сложно отследить где именно ошибка
+- ❌ Нет working code до конца
+- ❌ Невозможно тестировать по частям
+- ❌ Высокий риск для сложного проекта
+
+### ✅ Vertical Slices: ONE FEATURE END-TO-END
+
+```
+Правильный подход:
+1. Выбрать ОДНУ простую фичу
+2. Реализовать от Database → Backend → API → Test
+3. Убедиться что работает
+4. Коммит
+5. Следующая фича
+```
+
+**Почему правильно:**
+- ✅ Working code на каждом этапе
+- ✅ Проблемы видны сразу
+- ✅ Можно тестировать немедленно
+- ✅ Уверенность в архитектуре
+- ✅ Низкий риск
+
+### 📊 Vertical Slices для нашего проекта:
+
+```
+SLICE #1: "View Markets" (ПРОСТЕЙШИЙ)
+├── Database: users, markets tables (базовые)
+├── API: GET /markets (без auth)
+├── Test: curl → видим JSON
+└── ✅ Milestone: Working API!
+
+SLICE #2: "Auth"
+├── Security: Telegram initData validation
+├── API: GET /user/profile (требует auth)
+├── Test: auth works
+└── ✅ Milestone: Secure API!
+
+SLICE #3: "Simple Bet"
+├── Database: orders, ledger (базовые)
+├── API: POST /bet (БЕЗ матчинга пока)
+├── Test: order создается
+└── ✅ Milestone: Can place bets!
+
+SLICE #4: "Matching" (ИТЕРАТИВНО)
+├── Iteration 1: Simple matching
+├── Iteration 2: Price-Time Priority
+├── Iteration 3: Comprehensive tests
+└── ✅ Milestone: Orders match!
+
+SLICE #5: "WebSocket"
+├── Real-time updates
+└── ✅ Milestone: Live data!
+
+SLICE #6: "Frontend MVP"
+├── Базовый Mini App
+├── Интеграция с API
+└── ✅ Milestone: Working app!
+```
+
+### 🎓 Ключевые принципы:
+
+1. **Делать просто → потом улучшать**
+   - ❌ НЕ делать сразу production-ready
+   - ✅ Сначала working version
+   - ✅ Потом оптимизировать
+
+2. **Тестировать сразу**
+   - ✅ После каждого slice → test
+   - ✅ Не накапливать untested code
+
+3. **Коммитить часто**
+   - ✅ Каждый slice → commit
+   - ✅ Можем откатиться если что-то не так
+
+4. **Итеративное улучшение**
+   - ✅ Matching Engine v1 (simple) → v2 (Price-Time) → v3 (optimized)
+   - ✅ Database schema v1 (basic) → v2 (indexes) → v3 (partitioning)
+
+---
+
+## 📋 UPDATED ROADMAP: VERTICAL SLICES (v2.1)
+
+### ✅ WEEK 1: CORE VERTICAL SLICES
+
+#### День 1 (СДЕЛАНО ✅)
+- ✅ Создан Telegram бот (BOT_TOKEN получен)
+- ✅ Git repository настроен
+- ✅ Структура проекта создана
+- ✅ .env файл с секретами (защищен)
+- ✅ README.md, PLAN.md
+
+**Milestone:** Project foundation ready
+
+---
+
+#### День 2-3: SLICE #1 - "View Markets"
+
+**Цель:** Проверить что stack работает (FastAPI + PostgreSQL)
+
+**Tasks:**
+- [ ] PostgreSQL setup (Docker или local install)
+- [ ] Database connection в FastAPI
+- [ ] Базовая schema:
+  ```sql
+  CREATE TABLE users (
+      id SERIAL PRIMARY KEY,
+      telegram_id BIGINT UNIQUE NOT NULL,
+      first_name VARCHAR(255),
+      created_at TIMESTAMP DEFAULT NOW()
+  );
+
+  CREATE TABLE markets (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      deadline TIMESTAMP NOT NULL,
+      resolved BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
+  );
+  ```
+- [ ] Seed 2-3 тестовых рынка:
+  ```python
+  # seed_data.py
+  markets = [
+      {"title": "Биткоин выше $100k до конца февраля?", "deadline": "2026-02-28"},
+      {"title": "Спартак выиграет следующий матч?", "deadline": "2026-02-15"},
+  ]
+  ```
+- [ ] FastAPI app setup:
+  ```python
+  # app/main.py
+  from fastapi import FastAPI
+  from app.db.session import engine
+  from app.api.routes import markets
+
+  app = FastAPI(title="Pravda Market API")
+  app.include_router(markets.router)
+  ```
+- [ ] GET /markets endpoint:
+  ```python
+  # app/api/routes/markets.py
+  @router.get("/markets")
+  async def get_markets(db: Session = Depends(get_db)):
+      markets = db.query(Market).filter(Market.resolved == False).all()
+      return markets
+  ```
+- [ ] **TEST:**
+  ```bash
+  curl http://localhost:8000/markets
+  # Должны увидеть JSON с рынками
+  ```
+- [ ] Git commit
+
+**Deliverable:** ✅ Working API endpoint!
+
+---
+
+#### День 4-5: SLICE #2 - "Telegram Auth"
+
+**Цель:** Проверить что auth работает
+
+**Tasks:**
+- [ ] Реализовать validation из PLAN.md:
+  ```python
+  # app/core/security.py
+  def validate_telegram_init_data(init_data: str) -> dict:
+      # HMAC-SHA256 validation
+      # Timestamp check (< 24h)
+      # Return user data
+  ```
+- [ ] Dependency для auth:
+  ```python
+  # app/api/deps.py
+  async def get_current_user(
+      authorization: str = Header(...),
+      db = Depends(get_db)
+  ) -> User:
+      # Validate init_data
+      # Get or create user
+      return user
+  ```
+- [ ] GET /user/profile endpoint:
+  ```python
+  @router.get("/user/profile")
+  async def get_profile(user = Depends(get_current_user)):
+      return {
+          "id": user.id,
+          "telegram_id": user.telegram_id,
+          "first_name": user.first_name
+      }
+  ```
+- [ ] **TEST с curl:**
+  ```bash
+  # Без auth → 401
+  curl http://localhost:8000/user/profile
+
+  # С auth → 200 OK
+  curl -H "Authorization: twa query_id=xxx&user=..." http://localhost:8000/user/profile
+  ```
+- [ ] Git commit
+
+**Deliverable:** ✅ Secure API with auth!
+
+---
+
+#### День 6-7: SLICE #3 - "Simple Bet (v1)"
+
+**Цель:** Проверить что можем работать с ордерами и деньгами
+
+**Tasks:**
+- [ ] Добавить таблицы:
+  ```sql
+  CREATE TABLE orders (
+      id BIGSERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      market_id INTEGER REFERENCES markets(id),
+      side VARCHAR(3) CHECK (side IN ('yes', 'no')),
+      price_bp INTEGER CHECK (price_bp >= 0 AND price_bp <= 10000),
+      amount_kopecks BIGINT CHECK (amount_kopecks > 0),
+      status VARCHAR(20) DEFAULT 'open',
+      created_at TIMESTAMP DEFAULT NOW()
+  );
+
+  CREATE TABLE ledger (
+      id BIGSERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      amount_kopecks BIGINT NOT NULL,
+      type VARCHAR(30) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+  );
+  ```
+- [ ] Seed начальный баланс пользователям:
+  ```python
+  # Дать 1000₽ для тестирования
+  ledger_entry = LedgerEntry(user_id=1, amount_kopecks=100000, type='deposit')
+  ```
+- [ ] POST /bet endpoint (ПРОСТАЯ версия):
+  ```python
+  @router.post("/bet")
+  async def place_bet(
+      market_id: int,
+      side: str,
+      price: float,  # 0.65 = 65%
+      amount: float,  # в рублях
+      user = Depends(get_current_user),
+      db = Depends(get_db)
+  ):
+      # 1. Проверить баланс (простая проверка)
+      balance = db.query(func.sum(Ledger.amount_kopecks)).filter_by(user_id=user.id).scalar()
+      required = int(amount * 100)
+      if balance < required:
+          raise HTTPException(400, "Insufficient funds")
+
+      # 2. Создать order (БЕЗ матчинга пока!)
+      order = Order(
+          user_id=user.id,
+          market_id=market_id,
+          side=side,
+          price_bp=int(price * 10000),
+          amount_kopecks=required,
+          status='open'
+      )
+      db.add(order)
+
+      # 3. Заблокировать средства
+      db.add(LedgerEntry(
+          user_id=user.id,
+          amount_kopecks=-required,
+          type='order_lock'
+      ))
+
+      db.commit()
+      return {"success": True, "order_id": order.id}
+  ```
+- [ ] GET /orders endpoint:
+  ```python
+  @router.get("/orders")
+  async def get_orders(user = Depends(get_current_user), db = Depends(get_db)):
+      orders = db.query(Order).filter_by(user_id=user.id).all()
+      return orders
+  ```
+- [ ] **TEST:**
+  ```bash
+  # Создать ставку
+  curl -X POST http://localhost:8000/bet \
+    -H "Authorization: twa ..." \
+    -d '{"market_id": 1, "side": "yes", "price": 0.65, "amount": 100}'
+
+  # Проверить что order создан
+  curl http://localhost:8000/orders -H "Authorization: twa ..."
+  ```
+- [ ] Git commit
+
+**Deliverable:** ✅ Can create orders!
+
+---
+
+#### День 8-10: SLICE #4 - "Matching Engine (Iterative)"
+
+**Цель:** Реализовать матчинг ПОСТЕПЕННО
+
+**Iteration 1: Simple Matching (День 8)**
+- [ ] Простой matching при создании order:
+  ```python
+  def try_match_simple(new_order, db):
+      # Найти противоположные orders
+      counter_orders = db.query(Order).filter(
+          Order.market_id == new_order.market_id,
+          Order.side != new_order.side,
+          Order.status == 'open'
+      ).all()
+
+      # Матчинг с первым подходящим
+      if counter_orders:
+          counter = counter_orders[0]
+          # Создать trade (простая версия)
+          # Обновить статусы
+  ```
+- [ ] **TEST:** Два ордера матчатся
+- [ ] Git commit
+
+**Iteration 2: Price-Time Priority (День 9)**
+- [ ] Добавить SortedDict orderbook
+- [ ] Реализовать Price-Time Priority (код из PLAN.md)
+- [ ] **TEST:** Лучшая цена исполняется первой
+- [ ] Git commit
+
+**Iteration 3: Comprehensive Tests (День 10)**
+- [ ] Unit tests:
+  - [ ] Simple match
+  - [ ] Partial fills
+  - [ ] Price-time priority
+  - [ ] Insufficient funds
+  - [ ] Cancel order
+- [ ] Target: 95%+ coverage для matching engine
+- [ ] Git commit
+
+**Deliverable:** ✅ Production-ready matching engine!
+
+---
+
+### ✅ WEEK 2: API POLISH & REAL-TIME
 
 #### День 1-2: Setup & Infrastructure
 - [ ] Создать Telegram бота через @BotFather
