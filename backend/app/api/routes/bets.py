@@ -196,9 +196,10 @@ def get_balance(
     available = get_available_balance(user.id, db)  # Same as total in current implementation
 
     # Calculate locked separately for display
+    # Sum both order_lock (negative) and order_unlock (positive) entries
     locked = db.query(func.sum(LedgerEntry.amount_kopecks)).filter(
         LedgerEntry.user_id == user.id,
-        LedgerEntry.type == 'order_lock'
+        LedgerEntry.type.in_(['order_lock', 'order_unlock'])
     ).scalar()
     locked_amount = abs(locked) if locked else 0
 
