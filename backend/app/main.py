@@ -4,9 +4,13 @@ Pravda Market API - FastAPI Application
 Простое prediction market приложение для Telegram Mini App
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+
+from app.db.session import get_db, init_db
+from app.db.models import Market
 
 # Создаем FastAPI приложение
 app = FastAPI(
@@ -14,6 +18,18 @@ app = FastAPI(
     description="Платформа коллективных прогнозов для российского рынка",
     version="0.1.0",
 )
+
+
+# Инициализация database при старте
+@app.on_event("startup")
+async def startup_event():
+    """
+    Выполняется при запуске приложения
+
+    Создает database tables если их нет
+    """
+    init_db()
+    print("[OK] Database initialized")
 
 # CORS для frontend (Telegram Mini App)
 app.add_middleware(
@@ -50,47 +66,29 @@ async def health():
 
 
 @app.get("/markets")
-async def get_markets():
+async def get_markets(db: Session = Depends(get_db)):
     """
-    Получить список активных рынков (пока mock данные)
+    Получить список активных рынков из database
 
-    TODO: Заменить на реальные данные из database
+    Returns: List of active (unresolved) markets
     """
-    # Mock данные для тестирования
+    # Получить активные рынки из database
+    markets = db.query(Market).filter(Market.resolved == False).all()
+
+    # Конвертировать в JSON-friendly format
     return [
         {
-            "id": 1,
-            "title": "Биткоин выше $100,000 до конца февраля 2026?",
-            "description": "Достигнет ли BTC цены $100k или выше до 28 февраля 2026 23:59 UTC?",
-            "deadline": (datetime.now() + timedelta(days=27)).isoformat(),
-            "resolved": False,
-            "yes_price": 0.65,
-            "no_price": 0.35,
-            "volume": 125000,  # в рублях
-            "category": "crypto",
-        },
-        {
-            "id": 2,
-            "title": "Спартак выиграет следующий матч РПЛ?",
-            "description": "Победит ли Спартак Москва в следующем матче чемпионата России?",
-            "deadline": (datetime.now() + timedelta(days=14)).isoformat(),
-            "resolved": False,
-            "yes_price": 0.58,
-            "no_price": 0.42,
-            "volume": 45000,
-            "category": "sports",
-        },
-        {
-            "id": 3,
-            "title": "Температура в Москве выше +5°C 15 февраля?",
-            "description": "Будет ли максимальная дневная температура в Москве выше +5°C 15 февраля 2026?",
-            "deadline": (datetime.now() + timedelta(days=14)).isoformat(),
-            "resolved": False,
-            "yes_price": 0.42,
-            "no_price": 0.58,
-            "volume": 18000,
-            "category": "weather",
-        },
+            "id": market.id,
+            "title": market.title,
+            "description": market.description,
+            "deadline": market.deadline.isoformat(),
+            "resolved": market.resolved,
+            "yes_price": market.yes_price_decimal,  # 0.0 - 1.0
+            "no_price": market.no_price_decimal,
+            "volume": market.volume_rubles,  # в рублях
+            "category": market.category,
+        }
+        for market in markets
     ]
 
 
