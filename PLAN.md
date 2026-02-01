@@ -983,65 +983,82 @@ SLICE #6: "Frontend MVP"
 
 ---
 
-#### День 2-3: SLICE #1 - "View Markets"
+#### День 2-3: SLICE #1 - "View Markets" ✅ ЗАВЕРШЕНО
 
-**Цель:** Проверить что stack работает (FastAPI + PostgreSQL)
+**Цель:** Проверить что stack работает (FastAPI + Database)
 
 **Tasks:**
-- [ ] PostgreSQL setup (Docker или local install)
-- [ ] Database connection в FastAPI
-- [ ] Базовая schema:
-  ```sql
-  CREATE TABLE users (
-      id SERIAL PRIMARY KEY,
-      telegram_id BIGINT UNIQUE NOT NULL,
-      first_name VARCHAR(255),
-      created_at TIMESTAMP DEFAULT NOW()
-  );
-
-  CREATE TABLE markets (
-      id SERIAL PRIMARY KEY,
-      title TEXT NOT NULL,
-      description TEXT,
-      deadline TIMESTAMP NOT NULL,
-      resolved BOOLEAN DEFAULT FALSE,
-      created_at TIMESTAMP DEFAULT NOW()
-  );
-  ```
-- [ ] Seed 2-3 тестовых рынка:
+- [x] Database setup (использовали SQLite вместо PostgreSQL для MVP)
+- [x] Database connection в FastAPI
+- [x] Полная schema с production-ready моделями:
+  - User (id, telegram_id, username, first_name, created_at, updated_at)
+  - Market (id, title, description, category, deadline, resolved, resolution_value, yes_price, no_price, volume, created_at, updated_at)
+  - Properties: yes_price_decimal, no_price_decimal, volume_rubles
+- [x] Seed script с 5 тестовыми рынками (backend/seed.py):
   ```python
-  # seed_data.py
   markets = [
-      {"title": "Биткоин выше $100k до конца февраля?", "deadline": "2026-02-28"},
-      {"title": "Спартак выиграет следующий матч?", "deadline": "2026-02-15"},
+      {"title": "Биткоин выше $100,000 до конца февраля 2026?", "category": "crypto", "yes_price": 6500, "volume": 12500000},
+      {"title": "Спартак выиграет следующий матч РПЛ?", "category": "sports", "yes_price": 5800, "volume": 4500000},
+      {"title": "Температура в Москве выше +5°C 15 февраля?", "category": "weather", "yes_price": 4200, "volume": 1800000},
+      {"title": "Ethereum достигнет $5,000 в марте 2026?", "category": "crypto", "yes_price": 5500, "volume": 8200000},
+      {"title": "ЦСКА займет топ-3 в РПЛ этого сезона?", "category": "sports", "yes_price": 7200, "volume": 3100000},
   ]
   ```
-- [ ] FastAPI app setup:
+- [x] FastAPI app setup с CORS middleware:
   ```python
-  # app/main.py
-  from fastapi import FastAPI
-  from app.db.session import engine
-  from app.api.routes import markets
+  # app/main.py - полная реализация
+  app = FastAPI(title="Pravda Market API", version="0.1.0")
+  app.add_middleware(CORSMiddleware, allow_origins=["*"])
 
-  app = FastAPI(title="Pravda Market API")
-  app.include_router(markets.router)
+  @app.on_event("startup")
+  async def startup_event():
+      init_db()
   ```
-- [ ] GET /markets endpoint:
+- [x] GET / (root endpoint)
+- [x] GET /health (health check)
+- [x] GET /markets endpoint (возвращает активные рынки из БД):
   ```python
-  # app/api/routes/markets.py
-  @router.get("/markets")
+  @app.get("/markets")
   async def get_markets(db: Session = Depends(get_db)):
       markets = db.query(Market).filter(Market.resolved == False).all()
-      return markets
+      return [
+          {
+              "id": market.id,
+              "title": market.title,
+              "description": market.description,
+              "deadline": market.deadline.isoformat(),
+              "resolved": market.resolved,
+              "yes_price": market.yes_price_decimal,
+              "no_price": market.no_price_decimal,
+              "volume": market.volume_rubles,
+              "category": market.category,
+          }
+          for market in markets
+      ]
   ```
-- [ ] **TEST:**
+- [x] **ТЕСТЫ выполнены:**
   ```bash
-  curl http://localhost:8000/markets
-  # Должны увидеть JSON с рынками
+  # Все endpoints протестированы и работают
+  curl http://localhost:8000/         # {"message": "Pravda Market API", "status": "working"}
+  curl http://localhost:8000/health   # {"status": "healthy", "timestamp": "..."}
+  curl http://localhost:8000/markets  # [{"id": 1, "title": "...", ...}, ...]
   ```
-- [ ] Git commit
+- [x] Git commits (4 шт):
+  1. Initial FastAPI setup with mock data
+  2. Add database models and session management
+  3. Add seed script with 5 test markets
+  4. Update app to read markets from database
 
-**Deliverable:** ✅ Working API endpoint!
+**Deliverable:** ✅ Working API with database! Server running at localhost:8000, database populated with 5 markets.
+
+**Актуальные файлы:**
+- [backend/app/main.py](backend/app/main.py) - FastAPI application
+- [backend/app/db/models.py](backend/app/db/models.py) - SQLAlchemy models
+- [backend/app/db/session.py](backend/app/db/session.py) - Database session management
+- [backend/seed.py](backend/seed.py) - Seed script
+- [backend/pravda_market.db](backend/pravda_market.db) - SQLite database (5 markets)
+
+**Дата завершения:** 2026-02-01
 
 ---
 
