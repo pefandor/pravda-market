@@ -4,10 +4,13 @@ SQLAlchemy Models для Pravda Market
 Базовые модели для MVP:
 - User: пользователи из Telegram
 - Market: prediction markets
+- Order: ставки пользователей
+- LedgerEntry: история транзакций
 """
 
-from sqlalchemy import Boolean, Column, Integer, String, DateTime, Text
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, Text, BigInteger, ForeignKey, CheckConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 from datetime import datetime
 
 Base = declarative_base()
@@ -28,6 +31,10 @@ class User(Base):
     first_name = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    orders = relationship("Order", back_populates="user")
+    ledger_entries = relationship("LedgerEntry", back_populates="user")
 
     def __repr__(self):
         return f"<User(id={self.id}, telegram_id={self.telegram_id}, first_name='{self.first_name}')>"
@@ -64,6 +71,9 @@ class Market(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Relationships
+    orders = relationship("Order", back_populates="market")
+
     def __repr__(self):
         return f"<Market(id={self.id}, title='{self.title[:50]}...', resolved={self.resolved})>"
 
@@ -83,9 +93,79 @@ class Market(Base):
         return self.volume / 100
 
 
+class Order(Base):
+    """
+    Ордер пользователя (ставка)
+
+    Хранит информацию о размещённой ставке
+    """
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    market_id = Column(Integer, ForeignKey("markets.id"), nullable=False, index=True)
+    side = Column(String(3), nullable=False)  # 'yes' or 'no'
+    price_bp = Column(Integer, nullable=False)  # basis points (6500 = 65%)
+    amount_kopecks = Column(BigInteger, nullable=False)  # в копейках
+    filled_kopecks = Column(BigInteger, default=0)
+    status = Column(String(20), default='open', index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="orders")
+    market = relationship("Market", back_populates="orders")
+
+    # Constraints (CRITICAL - data integrity)
+    __table_args__ = (
+        CheckConstraint('price_bp >= 0 AND price_bp <= 10000', name='valid_price'),
+        CheckConstraint('amount_kopecks > 0', name='positive_amount'),
+        CheckConstraint("side IN ('yes', 'no')", name='valid_side'),
+        CheckConstraint("status IN ('open', 'partial', 'filled', 'cancelled')", name='valid_status'),
+    )
+
+    def __repr__(self):
+        return f"<Order(id={self.id}, user_id={self.user_id}, market_id={self.market_id}, side={self.side}, status={self.status})>"
+
+    @property
+    def price_decimal(self) -> float:
+        """Цена в десятичном формате (0.0 - 1.0)"""
+        return self.price_bp / 10000
+
+    @property
+    def amount_rubles(self) -> float:
+        """Сумма в рублях"""
+        return self.amount_kopecks / 100
+
+
+class LedgerEntry(Base):
+    """
+    Запись в ledger (история транзакций)
+
+    Используется для ledger-based balance management
+    """
+    __tablename__ = "ledger"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    amount_kopecks = Column(BigInteger, nullable=False)
+    type = Column(String(30), nullable=False, index=True)
+    reference_id = Column(BigInteger, nullable=True)  # order_id, trade_id
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship
+    user = relationship("User", back_populates="ledger_entries")
+
+    # Composite index для get_available_balance() performance
+    __table_args__ = (
+        Index('idx_ledger_user_type', 'user_id', 'type'),
+    )
+
+    def __repr__(self):
+        return f"<LedgerEntry(id={self.id}, user_id={self.user_id}, type={self.type}, amount={self.amount_kopecks/100:.2f}₽)>"
+
+
 # В будущем добавим:
-# - Order (ордера)
 # - Trade (исполненные сделки)
-# - Ledger (балансы)
 # - PaymentRequest (платежи)
 # - OrderEvent (audit trail)

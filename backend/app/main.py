@@ -4,14 +4,20 @@ Pravda Market API - FastAPI Application
 Простое prediction market приложение для Telegram Mini App
 """
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+from typing import Dict, List, Any
+import os
 
 from app.db.session import get_db, init_db
 from app.db.models import Market
-from app.api.routes import users
+from app.api.routes import users, bets, ledger
+from app.core.logging_config import setup_logging, get_logger
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.core.rate_limit import limiter
 
 # Создаем FastAPI приложение
 app = FastAPI(
@@ -19,6 +25,10 @@ app = FastAPI(
     description="Платформа коллективных прогнозов для российского рынка",
     version="0.1.0",
 )
+
+# Add rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # Инициализация database при старте
@@ -29,8 +39,20 @@ async def startup_event():
 
     Создает database tables если их нет
     """
+    # Setup logging
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    json_logs = os.getenv("LOG_FORMAT", "text") == "json"
+    setup_logging(level=log_level, json_format=json_logs)
+
+    logger = get_logger()
+    logger.info("Starting Pravda Market API", extra={
+        "version": "0.1.0",
+        "environment": os.getenv("ENVIRONMENT", "development")
+    })
+
+    # Initialize database
     init_db()
-    print("[OK] Database initialized")
+    logger.info("Database initialized successfully")
 
 # CORS для frontend (Telegram Mini App)
 app.add_middleware(
@@ -43,10 +65,12 @@ app.add_middleware(
 
 # Подключение роутеров
 app.include_router(users.router)
+app.include_router(bets.router)
+app.include_router(ledger.router)
 
 
 @app.get("/")
-async def root():
+def root() -> Dict[str, str]:
     """
     Корневой endpoint - проверка что API работает
     """
@@ -59,7 +83,8 @@ async def root():
 
 
 @app.get("/health")
-async def health():
+@limiter.limit("60/minute")
+def health(request: Request) -> Dict[str, str]:
     """
     Health check endpoint
     """
@@ -70,7 +95,7 @@ async def health():
 
 
 @app.get("/markets")
-async def get_markets(db: Session = Depends(get_db)):
+async def get_markets(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
     """
     Получить список активных рынков из database
 

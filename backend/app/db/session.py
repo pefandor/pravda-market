@@ -7,6 +7,9 @@ Database Session Management
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
+from app.core.logging_config import get_logger
+
+logger = get_logger()
 
 # SQLite database file path
 DATABASE_FILE = "pravda_market.db"
@@ -49,9 +52,9 @@ def init_db():
     """
     from app.db.models import Base
 
-    print(f"Creating database: {DATABASE_URL}")
+    logger.info("Creating database tables", extra={"database_url": DATABASE_URL})
     Base.metadata.create_all(bind=engine)
-    print("[OK] Database tables created")
+    logger.info("Database tables created successfully")
 
 
 def drop_db():
@@ -60,9 +63,9 @@ def drop_db():
     """
     from app.db.models import Base
 
-    print("Dropping all tables...")
+    logger.warning("Dropping all database tables")
     Base.metadata.drop_all(bind=engine)
-    print("[OK] All tables dropped")
+    logger.info("All database tables dropped")
 
 
 # Для удобства

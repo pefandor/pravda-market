@@ -10,9 +10,12 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models import User
 from app.core.security import validate_telegram_init_data
+from app.core.logging_config import get_logger
+
+logger = get_logger()
 
 
-async def get_current_user(
+def get_current_user(
     authorization: str = Header(..., description="Telegram initData (format: 'twa <initData>')"),
     db: Session = Depends(get_db)
 ) -> User:
@@ -27,7 +30,7 @@ async def get_current_user(
 
     Usage in endpoints:
         @app.get("/user/profile")
-        async def get_profile(user: User = Depends(get_current_user)):
+        def get_profile(user: User = Depends(get_current_user)):
             return {"user_id": user.id, "name": user.first_name}
 
     Args:
@@ -44,6 +47,9 @@ async def get_current_user(
 
     # Check Authorization header format
     if not authorization.startswith("twa "):
+        logger.warning("Invalid authorization header format", extra={
+            "header_prefix": authorization[:10] if len(authorization) > 10 else authorization
+        })
         raise HTTPException(
             status_code=401,
             detail="Invalid authorization header format. Expected: 'Authorization: twa <initData>'"
@@ -76,6 +82,16 @@ async def get_current_user(
         db.commit()
         db.refresh(user)
 
-        print(f"[OK] New user registered: {user.telegram_id} ({user.first_name})")
+        logger.info("New user auto-registered", extra={
+            "telegram_id": user.telegram_id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "user_id": user.id
+        })
+    else:
+        logger.debug("Existing user authenticated", extra={
+            "telegram_id": user.telegram_id,
+            "user_id": user.id
+        })
 
     return user
