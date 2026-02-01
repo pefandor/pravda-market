@@ -1062,51 +1062,49 @@ SLICE #6: "Frontend MVP"
 
 ---
 
-#### День 4-5: SLICE #2 - "Telegram Auth"
+#### День 4-5: SLICE #2 - "Telegram Auth" ✅ ЗАВЕРШЕНО
 
 **Цель:** Проверить что auth работает
 
 **Tasks:**
-- [ ] Реализовать validation из PLAN.md:
-  ```python
-  # app/core/security.py
-  def validate_telegram_init_data(init_data: str) -> dict:
-      # HMAC-SHA256 validation
-      # Timestamp check (< 24h)
-      # Return user data
-  ```
-- [ ] Dependency для auth:
-  ```python
-  # app/api/deps.py
-  async def get_current_user(
-      authorization: str = Header(...),
-      db = Depends(get_db)
-  ) -> User:
-      # Validate init_data
-      # Get or create user
-      return user
-  ```
-- [ ] GET /user/profile endpoint:
-  ```python
-  @router.get("/user/profile")
-  async def get_profile(user = Depends(get_current_user)):
-      return {
-          "id": user.id,
-          "telegram_id": user.telegram_id,
-          "first_name": user.first_name
-      }
-  ```
-- [ ] **TEST с curl:**
-  ```bash
-  # Без auth → 401
-  curl http://localhost:8000/user/profile
+- [x] Реализовать validation с production-ready security:
+  - app/core/security.py - validate_telegram_init_data()
+  - HMAC-SHA256 signature verification
+  - Timestamp check (max 24 hours old)
+  - Constant-time hash comparison (prevent timing attacks)
+  - Auto-load .env with dotenv
+  - create_mock_init_data() helper for testing
+- [x] Dependency для auth:
+  - app/api/deps.py - get_current_user()
+  - Authorization header validation ("twa <initData>")
+  - Auto-registration of new users
+  - Database query for existing users
+  - Returns User object
+- [x] Endpoints с authentication:
+  - GET /user/profile - full user profile
+  - GET /user/me - short alias
+  - Both require valid Telegram auth
+- [x] **Тестирование:**
+  - test_auth.py - automated test script
+  - ✅ No auth header → 422 "Field required"
+  - ✅ Invalid auth → 401 "Invalid Telegram authentication"
+  - ✅ Valid auth → 200 with user data
+  - ✅ Auto-registration works (new users created)
+  - ✅ Duplicate prevention (same telegram_id returns same user)
+- [x] Bug fixes:
+  - Fixed UnboundLocalError with json import
+  - Moved json import to module level
+- [x] Git commit
 
-  # С auth → 200 OK
-  curl -H "Authorization: twa query_id=xxx&user=..." http://localhost:8000/user/profile
-  ```
-- [ ] Git commit
+**Deliverable:** ✅ Secure API with production-ready Telegram authentication!
 
-**Deliverable:** ✅ Secure API with auth!
+**Актуальные файлы:**
+- [backend/app/core/security.py](backend/app/core/security.py) - Telegram auth validation
+- [backend/app/api/deps.py](backend/app/api/deps.py) - FastAPI dependencies
+- [backend/app/api/routes/users.py](backend/app/api/routes/users.py) - User endpoints
+- [backend/test_auth.py](backend/test_auth.py) - Test script
+
+**Дата завершения:** 2026-02-01
 
 ---
 
