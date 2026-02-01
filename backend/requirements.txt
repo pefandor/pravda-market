@@ -1,0 +1,21 @@
+# МИНИМАЛЬНЫЙ SET для быстрого старта
+
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.1
+
+# Database (SQLite для начала - проще setup)
+sqlalchemy==2.0.36
+
+# Order Matching Engine (ГОТОВЫЙ!)
+lightmatchingengine==2019.1.4
+
+# Security & Environment
+python-dotenv==1.0.1
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+
+# HTTP Client (для тестов)
+httpx==0.28.1
