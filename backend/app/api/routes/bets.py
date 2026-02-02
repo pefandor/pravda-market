@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from app.db.session import get_db
-from app.db.models import User, Order, LedgerEntry, Market
+from app.db.models import User, Order, LedgerEntry, Market, Trade
 from app.api.deps import get_current_user
 from app.services.balance import get_available_balance, has_sufficient_balance, get_user_balance
 from app.services.matching import match_order
@@ -315,3 +315,80 @@ def cancel_order(
             "order_id": order_id
         })
         raise HTTPException(500, "Failed to cancel order")
+
+
+@router.get("/trades")
+@limiter.limit("30/minute")
+def get_trades(
+    request: Request,
+    market_id: Optional[int] = None,
+    limit: int = 50,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    Get user's trade history (PRIVACY enforced)
+
+    Returns only trades where the user participated (as YES or NO buyer).
+    This ensures users cannot see other users' trades.
+
+    Args:
+        market_id: Optional filter by specific market
+        limit: Number of trades to return (default 50, max 100)
+
+    Returns:
+        List of trades with details
+
+    Security:
+        - User sees ONLY their own trades
+        - No information about counterparty revealed
+    """
+    # Validate limit
+    if limit < 1:
+        limit = 50
+    if limit > 100:
+        limit = 100
+
+    # CRITICAL: Query trades where user participated
+    # User must be owner of either YES or NO order
+    query = db.query(Trade).join(
+        Order,
+        (Order.id == Trade.yes_order_id) | (Order.id == Trade.no_order_id)
+    ).filter(
+        Order.user_id == user.id  # PRIVACY: Only user's trades
+    )
+
+    # Optional market filter
+    if market_id is not None:
+        query = query.filter(Trade.market_id == market_id)
+
+    # Get trades ordered by newest first
+    trades = query.order_by(Trade.created_at.desc()).limit(limit).all()
+
+    # Format response
+    result = []
+    for trade in trades:
+        # Determine user's side (YES or NO)
+        yes_order = db.query(Order).filter(Order.id == trade.yes_order_id).first()
+        no_order = db.query(Order).filter(Order.id == trade.no_order_id).first()
+
+        user_side = "yes" if yes_order.user_id == user.id else "no"
+        user_cost = trade.yes_cost_kopecks if user_side == "yes" else trade.no_cost_kopecks
+
+        result.append({
+            "trade_id": trade.id,
+            "market_id": trade.market_id,
+            "side": user_side,  # User's side in this trade
+            "price": trade.price_decimal,  # YES price (0.0 - 1.0)
+            "amount": trade.amount_rubles,  # Total amount matched (₽)
+            "cost": user_cost / 100,  # User's cost for this trade (₽)
+            "created_at": trade.created_at.isoformat()
+        })
+
+    logger.info("Trades retrieved", extra={
+        "user_id": user.id,
+        "market_id": market_id,
+        "count": len(result)
+    })
+
+    return result

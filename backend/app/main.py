@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 import os
 
 from app.db.session import get_db, init_db
-from app.db.models import Market
+from app.db.models import Market, Order
 from app.api.routes import users, bets, ledger
 from app.core.logging_config import setup_logging, get_logger
 from slowapi import _rate_limit_exceeded_handler
@@ -128,9 +128,91 @@ async def get_markets(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
     ]
 
 
+@app.get("/markets/{market_id}/orderbook")
+@limiter.limit("60/minute")
+async def get_orderbook(
+    request: Request,
+    market_id: int,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Get orderbook for a specific market
+
+    Returns aggregated orders by price level for privacy.
+    Does not show individual user orders.
+
+    Args:
+        market_id: ID of the market
+
+    Returns:
+        Dictionary with yes_orders and no_orders aggregated by price
+
+    Security:
+        - Aggregates by price level (privacy: no user identification)
+        - Only shows open/partial orders (not filled/cancelled)
+    """
+    # Check market exists
+    market = db.query(Market).filter(Market.id == market_id).first()
+    if not market:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Market not found")
+
+    # Get YES orders (open/partial only)
+    yes_orders = db.query(Order).filter(
+        Order.market_id == market_id,
+        Order.side == 'yes',
+        Order.status.in_(['open', 'partial'])
+    ).all()
+
+    # Get NO orders (open/partial only)
+    no_orders = db.query(Order).filter(
+        Order.market_id == market_id,
+        Order.side == 'no',
+        Order.status.in_(['open', 'partial'])
+    ).all()
+
+    # Aggregate YES orders by price (privacy protection)
+    yes_book = {}
+    for order in yes_orders:
+        price = order.price_decimal
+        remaining_kopecks = order.amount_kopecks - order.filled_kopecks
+        remaining_rubles = remaining_kopecks / 100
+
+        if price in yes_book:
+            yes_book[price] += remaining_rubles
+        else:
+            yes_book[price] = remaining_rubles
+
+    # Aggregate NO orders by price (privacy protection)
+    no_book = {}
+    for order in no_orders:
+        price = order.price_decimal
+        remaining_kopecks = order.amount_kopecks - order.filled_kopecks
+        remaining_rubles = remaining_kopecks / 100
+
+        if price in no_book:
+            no_book[price] += remaining_rubles
+        else:
+            no_book[price] = remaining_rubles
+
+    # Format response (sorted by best price first)
+    return {
+        "market_id": market_id,
+        "yes_orders": [
+            {"price": price, "amount": amount}
+            for price, amount in sorted(yes_book.items(), reverse=True)
+        ],
+        "no_orders": [
+            {"price": price, "amount": amount}
+            for price, amount in sorted(no_book.items(), reverse=True)
+        ]
+    }
+
+
 # Запуск приложения:
 # uvicorn app.main:app --reload
 #
 # Тестирование:
 # curl http://localhost:8000/
 # curl http://localhost:8000/markets
+# curl http://localhost:8000/markets/1/orderbook
