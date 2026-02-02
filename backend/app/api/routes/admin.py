@@ -7,7 +7,7 @@ Requires admin authentication.
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Dict, Any
 import os
 
@@ -28,12 +28,13 @@ class ResolveRequest(BaseModel):
     """Request body for market resolution"""
     outcome: str  # "yes" or "no"
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "outcome": "yes"
             }
         }
+    )
 
 
 def get_admin_user(authorization: str = Header(...)) -> bool:
