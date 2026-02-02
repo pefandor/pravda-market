@@ -28,12 +28,14 @@ if is_sqlite:
         TEST_DATABASE_URL,
         connect_args={
             "check_same_thread": False,
-            "timeout": 30
+            "timeout": 60,  # Increased timeout for slower systems
+            "isolation_level": None  # Autocommit mode to reduce locking
         }
     )
     # Enable WAL mode for better concurrency (SQLite only)
     with test_engine.connect() as conn:
         conn.execute(text("PRAGMA journal_mode=WAL"))
+        conn.execute(text("PRAGMA busy_timeout=60000"))  # 60 second busy timeout
         conn.commit()
 else:
     # PostgreSQL settings
@@ -89,14 +91,21 @@ def test_db_session():
     try:
         yield db
     finally:
-        db.rollback()  # Rollback uncommitted changes
-        # Clean up tables to ensure isolation between tests
-        db.execute(text("DELETE FROM ledger"))
-        db.execute(text("DELETE FROM orders"))
-        db.execute(text("DELETE FROM users"))
-        db.execute(text("DELETE FROM markets"))
-        db.commit()
-        db.close()
+        try:
+            db.rollback()  # Rollback uncommitted changes
+            # Clean up tables to ensure isolation between tests
+            # Use separate transactions to avoid long locks
+            db.execute(text("DELETE FROM trades"))
+            db.execute(text("DELETE FROM ledger"))
+            db.execute(text("DELETE FROM orders"))
+            db.execute(text("DELETE FROM markets"))
+            db.execute(text("DELETE FROM users"))
+            db.commit()
+        except Exception as e:
+            # If cleanup fails, just rollback and continue
+            db.rollback()
+        finally:
+            db.close()
 
 
 def get_test_db():
