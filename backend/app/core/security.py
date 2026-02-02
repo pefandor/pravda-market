@@ -6,20 +6,14 @@ Validates Telegram initData using HMAC-SHA256
 
 import hmac
 import hashlib
-import os
 import json
 from urllib.parse import parse_qsl
 from datetime import datetime, timedelta
 from fastapi import HTTPException
+from app.core.config import settings
 
-# Load environment variables from .env file
-from dotenv import load_dotenv
-load_dotenv()
-
-# Get BOT_TOKEN from environment
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN environment variable not set")
+# Get BOT_TOKEN from settings
+BOT_TOKEN = settings.TELEGRAM_BOT_TOKEN
 
 # Init data max age (24 hours)
 INIT_DATA_MAX_AGE = timedelta(hours=24)

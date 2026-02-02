@@ -17,6 +17,7 @@ from app.db.session import get_db, init_db
 from app.db.models import Market, Order
 from app.api.routes import users, bets, ledger
 from app.core.logging_config import setup_logging, get_logger
+from app.core.config import settings
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.rate_limit import limiter
@@ -30,14 +31,12 @@ async def lifespan(app: FastAPI):
     Выполняется при запуске и остановке приложения
     """
     # Startup: Setup logging and initialize database
-    log_level = os.getenv("LOG_LEVEL", "INFO")
-    json_logs = os.getenv("LOG_FORMAT", "text") == "json"
-    setup_logging(level=log_level, json_format=json_logs)
+    setup_logging(level=settings.LOG_LEVEL, json_format=settings.use_json_logs)
 
     logger = get_logger()
     logger.info("Starting Pravda Market API", extra={
         "version": "0.1.0",
-        "environment": os.getenv("ENVIRONMENT", "development")
+        "environment": settings.ENVIRONMENT
     })
 
     # Initialize database
@@ -63,9 +62,10 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS для frontend (Telegram Mini App)
+# SECURITY: Restrict origins in production (configured via ALLOWED_ORIGINS env var)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В production ограничить
+    allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

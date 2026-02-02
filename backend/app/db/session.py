@@ -6,17 +6,13 @@ Database Session Management
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import os
-from dotenv import load_dotenv
+from app.core.config import settings
 from app.core.logging_config import get_logger
-
-# Load environment variables
-load_dotenv()
 
 logger = get_logger()
 
-# Get database URL from environment or use SQLite as fallback
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pravda_market.db")
+# Get database URL from settings
+DATABASE_URL = settings.DATABASE_URL
 
 # Determine if using SQLite
 is_sqlite = DATABASE_URL.startswith("sqlite")
