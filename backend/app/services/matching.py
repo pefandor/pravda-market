@@ -69,6 +69,12 @@ def match_order(new_order: Order, db: Session) -> List[Trade]:
         counter_remaining = counter.amount_kopecks - counter.filled_kopecks
         fill_amount = min(remaining, counter_remaining)
 
+        # Safety check: stop if fill amount is invalid
+        # This can happen in edge cases (e.g., concurrent updates)
+        # Using 'break' instead of 'continue' to avoid infinite loop
+        if fill_amount <= 0:
+            break
+
         # Execute trade
         trade = execute_trade(new_order, counter, fill_amount, db)
         trades.append(trade)
@@ -82,7 +88,10 @@ def match_order(new_order: Order, db: Session) -> List[Trade]:
         update_order_status(new_order)
         update_order_status(counter)
 
-    db.flush()
+        # CRITICAL: Flush changes to DB so next iteration sees updated statuses
+        # This ensures filled orders are filtered out in next find_best_match call
+        db.flush()
+
     return trades
 
 

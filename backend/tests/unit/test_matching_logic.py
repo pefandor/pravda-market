@@ -299,3 +299,360 @@ def test_settlement_large_amounts():
     assert yes_cost == 90_000_000
     assert no_cost == 10_000_000
     assert yes_cost + no_cost == 100_000_000
+
+
+# ============================================================================
+# PARTIAL FILLS TESTS (Phase 2)
+# ============================================================================
+
+@pytest.mark.unit
+def test_partial_fill_preserves_ledger_invariant(test_db_session):
+    """
+    CRITICAL: Partial fill preserves ledger invariant
+
+    Scenario:
+    - Order A: YES @ 6500bp for 30000 kopecks (300₽)
+    - Order B: NO @ 3500bp for 10000 kopecks (100₽)
+    - Expected: B fully filled, A partially filled (100₽), 200₽ remaining
+
+    Ledger invariant must hold: money is conserved
+    """
+    from app.services.matching import match_order
+    from datetime import datetime, timedelta
+
+    # Setup: Create two users with deposits
+    user_a = User(telegram_id=111, username="userA", first_name="User A")
+    user_b = User(telegram_id=222, username="userB", first_name="User B")
+    test_db_session.add_all([user_a, user_b])
+    test_db_session.flush()
+
+    # Deposit 1000₽ each
+    test_db_session.add(LedgerEntry(
+        user_id=user_a.id,
+        amount_kopecks=100000,
+        type='deposit',
+        reference_id=1
+    ))
+    test_db_session.add(LedgerEntry(
+        user_id=user_b.id,
+        amount_kopecks=100000,
+        type='deposit',
+        reference_id=2
+    ))
+    test_db_session.flush()
+
+    # Check ledger BEFORE matching
+    total_before = test_db_session.query(
+        func.sum(LedgerEntry.amount_kopecks)
+    ).filter(
+        LedgerEntry.type.in_(['deposit', 'withdrawal'])
+    ).scalar() or 0
+
+    # Create market
+    market = Market(
+        title="Test Market",
+        description="Test",
+        deadline=datetime.utcnow() + timedelta(days=7),
+        resolved=False
+    )
+    test_db_session.add(market)
+    test_db_session.flush()
+
+    # User A: Create large YES order @ 6500bp for 30000 kopecks (300₽)
+    order_a = Order(
+        user_id=user_a.id,
+        market_id=market.id,
+        side='yes',
+        price_bp=6500,
+        amount_kopecks=30000,
+        filled_kopecks=0,
+        status='open'
+    )
+    test_db_session.add(order_a)
+    test_db_session.flush()
+
+    # Lock funds for order A
+    test_db_session.add(LedgerEntry(
+        user_id=user_a.id,
+        amount_kopecks=-30000,
+        type='order_lock',
+        reference_id=order_a.id
+    ))
+
+    # User B: Create smaller NO order @ 3500bp for 10000 kopecks (100₽)
+    order_b = Order(
+        user_id=user_b.id,
+        market_id=market.id,
+        side='no',
+        price_bp=3500,
+        amount_kopecks=10000,
+        filled_kopecks=0,
+        status='open'
+    )
+    test_db_session.add(order_b)
+    test_db_session.flush()
+
+    # Lock funds for order B
+    test_db_session.add(LedgerEntry(
+        user_id=user_b.id,
+        amount_kopecks=-10000,
+        type='order_lock',
+        reference_id=order_b.id
+    ))
+    test_db_session.flush()
+
+    # Perform matching
+    trades = match_order(order_b, test_db_session)
+    test_db_session.flush()
+
+    # Check ledger AFTER matching
+    total_after = test_db_session.query(
+        func.sum(LedgerEntry.amount_kopecks)
+    ).filter(
+        LedgerEntry.type.in_(['deposit', 'withdrawal'])
+    ).scalar() or 0
+
+    # INVARIANT: Total money must remain constant!
+    assert total_before == total_after, \
+        f"Ledger invariant VIOLATED! Before: {total_before}, After: {total_after}"
+
+    # Verify trade created correctly
+    assert len(trades) == 1, "Should create exactly 1 trade"
+    trade = trades[0]
+    assert trade.amount_kopecks == 10000, "Trade amount should be 10000 kopecks (100₽)"
+    assert trade.yes_cost_kopecks == 6500, "YES cost should be 6500 (65%)"
+    assert trade.no_cost_kopecks == 3500, "NO cost should be 3500 (35%)"
+
+    # Verify order statuses
+    assert order_b.status == 'filled', "Order B should be fully filled"
+    assert order_b.filled_kopecks == 10000, "Order B filled amount should be 10000"
+
+    assert order_a.status == 'partial', "Order A should be partially filled"
+    assert order_a.filled_kopecks == 10000, "Order A filled amount should be 10000 (only 100₽ of 300₽)"
+
+
+@pytest.mark.unit
+def test_multiple_matches_single_order(test_db_session):
+    """
+    Test single order matching against multiple counter-orders
+
+    Scenario:
+    - Order A: YES @ 6500bp for 30000 kopecks (300₽)
+    - Order B1: NO @ 3500bp for 10000 kopecks (100₽)
+    - Order B2: NO @ 3500bp for 10000 kopecks (100₽)
+    - Order B3: NO @ 3500bp for 10000 kopecks (100₽)
+
+    Expected: A matches all 3 B orders (fully filled), all at same price
+    """
+    from app.services.matching import match_order
+    from datetime import datetime, timedelta
+
+    # Setup users (unique IDs to avoid conflicts with other tests)
+    user_a = User(telegram_id=2001, username="userA", first_name="User A")
+    user_b1 = User(telegram_id=2002, username="userB1", first_name="User B1")
+    user_b2 = User(telegram_id=2003, username="userB2", first_name="User B2")
+    user_b3 = User(telegram_id=2004, username="userB3", first_name="User B3")
+    test_db_session.add_all([user_a, user_b1, user_b2, user_b3])
+    test_db_session.flush()
+
+    # Deposits
+    for user in [user_a, user_b1, user_b2, user_b3]:
+        test_db_session.add(LedgerEntry(
+            user_id=user.id,
+            amount_kopecks=100000,
+            type='deposit',
+            reference_id=user.id
+        ))
+    test_db_session.flush()
+
+    # Create market
+    market = Market(
+        title="Test Market",
+        description="Test",
+        deadline=datetime.utcnow() + timedelta(days=7),
+        resolved=False
+    )
+    test_db_session.add(market)
+    test_db_session.flush()
+
+    # Create counter-orders first (B1, B2, B3) - these go on orderbook
+    orders_b = []
+    for i, user_b in enumerate([user_b1, user_b2, user_b3], 1):
+        order_b = Order(
+            user_id=user_b.id,
+            market_id=market.id,
+            side='no',
+            price_bp=3500,
+            amount_kopecks=10000,
+            filled_kopecks=0,
+            status='open'
+        )
+        test_db_session.add(order_b)
+        test_db_session.flush()
+
+        # Lock funds
+        test_db_session.add(LedgerEntry(
+            user_id=user_b.id,
+            amount_kopecks=-10000,
+            type='order_lock',
+            reference_id=order_b.id
+        ))
+        orders_b.append(order_b)
+
+    # Create large order A (will match all 3 B orders)
+    order_a = Order(
+        user_id=user_a.id,
+        market_id=market.id,
+        side='yes',
+        price_bp=6500,
+        amount_kopecks=30000,
+        filled_kopecks=0,
+        status='open'
+    )
+    test_db_session.add(order_a)
+    test_db_session.flush()
+
+    # Lock funds for A
+    test_db_session.add(LedgerEntry(
+        user_id=user_a.id,
+        amount_kopecks=-30000,
+        type='order_lock',
+        reference_id=order_a.id
+    ))
+    test_db_session.flush()
+
+    # Match order A against orderbook
+    trades = match_order(order_a, test_db_session)
+    test_db_session.flush()
+
+    # Verify: Should create 3 trades
+    assert len(trades) == 3, f"Should create 3 trades, got {len(trades)}"
+
+    # Verify all trades correct
+    for trade in trades:
+        assert trade.amount_kopecks == 10000, "Each trade should be 10000 kopecks"
+        assert trade.yes_cost_kopecks == 6500, "YES cost should be 6500"
+        assert trade.no_cost_kopecks == 3500, "NO cost should be 3500"
+
+    # Verify order A fully filled
+    assert order_a.status == 'filled', "Order A should be fully filled"
+    assert order_a.filled_kopecks == 30000, "Order A should have 30000 filled"
+
+    # Verify all B orders fully filled
+    for order_b in orders_b:
+        test_db_session.refresh(order_b)
+        assert order_b.status == 'filled', f"Order {order_b.id} should be filled"
+        assert order_b.filled_kopecks == 10000, f"Order {order_b.id} should have 10000 filled"
+
+
+@pytest.mark.unit
+def test_max_trades_per_order_limit(test_db_session):
+    """
+    DOS Protection: MAX_TRADES_PER_ORDER limit enforced
+
+    Scenario:
+    - Create 100 tiny NO orders (100 kopecks each)
+    - Create 1 large YES order (10000 kopecks = 100₽)
+    - MAX_TRADES_PER_ORDER = 50
+
+    Expected: Only 50 trades created, order stays 'partial'
+    """
+    from app.services.matching import match_order, MAX_TRADES_PER_ORDER
+    from datetime import datetime, timedelta
+
+    # Setup user (unique ID to avoid conflicts)
+    user_a = User(telegram_id=3001, username="userA_max", first_name="User A Max")
+    test_db_session.add(user_a)
+    test_db_session.flush()
+
+    # Deposit large amount
+    test_db_session.add(LedgerEntry(
+        user_id=user_a.id,
+        amount_kopecks=1000000,  # 10000₽
+        type='deposit',
+        reference_id=3001
+    ))
+    test_db_session.flush()
+
+    # Create market
+    market = Market(
+        title="Test Market",
+        description="Test",
+        deadline=datetime.utcnow() + timedelta(days=7),
+        resolved=False
+    )
+    test_db_session.add(market)
+    test_db_session.flush()
+
+    # Create 100 tiny NO orders on orderbook
+    for i in range(100):
+        user_b = User(telegram_id=10000 + i, username=f"userB_max_{i}", first_name=f"User B{i}")
+        test_db_session.add(user_b)
+        test_db_session.flush()
+
+        # Small deposit
+        test_db_session.add(LedgerEntry(
+            user_id=user_b.id,
+            amount_kopecks=10000,
+            type='deposit',
+            reference_id=1000 + i
+        ))
+
+        # Tiny NO order (200 kopecks = 2₽ each, total 200₽ in orderbook)
+        order_b = Order(
+            user_id=user_b.id,
+            market_id=market.id,
+            side='no',
+            price_bp=3500,
+            amount_kopecks=200,  # 2₽ each
+            filled_kopecks=0,
+            status='open'
+        )
+        test_db_session.add(order_b)
+        test_db_session.flush()
+
+        # Lock funds
+        test_db_session.add(LedgerEntry(
+            user_id=user_b.id,
+            amount_kopecks=-200,
+            type='order_lock',
+            reference_id=order_b.id
+        ))
+
+    # Create large YES order (should match all 100, but limited to 50)
+    # Order size = 200₽ (20000 kopecks) > 50 trades * 2₽ = 100₽
+    # So order will hit MAX_TRADES limit and remain partial
+    order_a = Order(
+        user_id=user_a.id,
+        market_id=market.id,
+        side='yes',
+        price_bp=6500,
+        amount_kopecks=20000,  # 200₽
+        filled_kopecks=0,
+        status='open'
+    )
+    test_db_session.add(order_a)
+    test_db_session.flush()
+
+    # Lock funds
+    test_db_session.add(LedgerEntry(
+        user_id=user_a.id,
+        amount_kopecks=-20000,
+        type='order_lock',
+        reference_id=order_a.id
+    ))
+    test_db_session.flush()
+
+    # Match (should hit MAX_TRADES limit)
+    trades = match_order(order_a, test_db_session)
+    test_db_session.flush()
+
+    # Verify: MAX_TRADES_PER_ORDER enforced
+    assert len(trades) == MAX_TRADES_PER_ORDER, \
+        f"Should create exactly {MAX_TRADES_PER_ORDER} trades (DOS protection), got {len(trades)}"
+
+    # Order should be partial (hit trade limit before fully filled)
+    # 50 trades * 200 kopecks = 10000 kopecks filled out of 20000 total
+    assert order_a.status == 'partial', "Order A should be partial (hit trade limit)"
+    assert order_a.filled_kopecks == MAX_TRADES_PER_ORDER * 200, \
+        f"Order A should have {MAX_TRADES_PER_ORDER * 200} filled (50 trades * 200 kopecks each)"
