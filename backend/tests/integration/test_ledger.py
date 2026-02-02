@@ -5,7 +5,7 @@ Integration Tests for Ledger Endpoints
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.db.models import Market, LedgerEntry, Order
 from app.core.security import create_mock_init_data
 
@@ -60,7 +60,7 @@ def test_get_transactions_full_flow(test_client, test_db_session, sample_user):
         title="Test Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -290,7 +290,7 @@ def test_get_transactions_description_formats(test_client, test_db_session, samp
         title="Test Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)

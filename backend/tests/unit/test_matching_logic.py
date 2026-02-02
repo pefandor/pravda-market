@@ -57,11 +57,11 @@ def test_ledger_invariant_after_match(test_db_session):
     assert total_before == 200000  # Sanity check (only deposits so far)
 
     # Create market
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     market = Market(
         title="Test Market",
         description="Test",
-        deadline=datetime.utcnow() + timedelta(days=7),  # 7 days from now
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),  # 7 days from now
         resolved=False
     )
     test_db_session.add(market)
@@ -318,7 +318,7 @@ def test_partial_fill_preserves_ledger_invariant(test_db_session):
     Ledger invariant must hold: money is conserved
     """
     from app.services.matching import match_order
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     # Setup: Create two users with deposits
     user_a = User(telegram_id=111, username="userA", first_name="User A")
@@ -352,7 +352,7 @@ def test_partial_fill_preserves_ledger_invariant(test_db_session):
     market = Market(
         title="Test Market",
         description="Test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -445,7 +445,7 @@ def test_multiple_matches_single_order(test_db_session):
     Expected: A matches all 3 B orders (fully filled), all at same price
     """
     from app.services.matching import match_order
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     # Setup users (unique IDs to avoid conflicts with other tests)
     user_a = User(telegram_id=2001, username="userA", first_name="User A")
@@ -469,7 +469,7 @@ def test_multiple_matches_single_order(test_db_session):
     market = Market(
         title="Test Market",
         description="Test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -558,7 +558,7 @@ def test_max_trades_per_order_limit(test_db_session):
     Expected: Only 50 trades created, order stays 'partial'
     """
     from app.services.matching import match_order, MAX_TRADES_PER_ORDER
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     # Setup user (unique ID to avoid conflicts)
     user_a = User(telegram_id=3001, username="userA_max", first_name="User A Max")
@@ -578,7 +578,7 @@ def test_max_trades_per_order_limit(test_db_session):
     market = Market(
         title="Test Market",
         description="Test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)

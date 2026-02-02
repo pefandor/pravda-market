@@ -5,7 +5,7 @@ Integration Tests for Bets Endpoints
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.db.models import Market, LedgerEntry, Order
 from app.core.security import create_mock_init_data
 
@@ -65,7 +65,7 @@ def test_place_bet_success(test_client, test_db_session, sample_user):
         title="Test Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -123,7 +123,7 @@ def test_place_bet_insufficient_funds(test_client, test_db_session, sample_user)
         title="Test Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -189,7 +189,7 @@ def test_place_bet_resolved_market(test_client, test_db_session, sample_user):
         title="Resolved Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() - timedelta(days=1),
+        deadline=datetime.now(timezone.utc) - timedelta(days=1),
         resolved=True,
         resolution_value=True
     )
@@ -235,7 +235,7 @@ def test_get_orders_with_data(test_client, test_db_session, sample_user):
         title="Test Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -283,7 +283,7 @@ def test_cancel_order_success(test_client, test_db_session, sample_user):
         title="Test Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -360,7 +360,7 @@ def test_cancel_order_already_cancelled(test_client, test_db_session, sample_use
         title="Test Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -405,7 +405,7 @@ def test_cancel_other_user_order(test_client, test_db_session, sample_user):
         title="Test Market",
         description="Test",
         category="test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)

@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import func
 from app.db.models import LedgerEntry, Order, Trade, Market, User
 from app.core.security import create_mock_init_data
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 @pytest.mark.integration
@@ -36,7 +36,7 @@ def test_exact_match_end_to_end(test_client, test_db_session):
     market = Market(
         title="Test Market",
         description="Test matching",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -216,7 +216,7 @@ def test_minimum_order_size_rejected(test_client, test_db_session):
     market = Market(
         title="Test Market",
         description="Test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)
@@ -259,7 +259,7 @@ def test_maximum_order_size_rejected(test_client, test_db_session):
     market = Market(
         title="Test Market",
         description="Test",
-        deadline=datetime.utcnow() + timedelta(days=7),
+        deadline=datetime.now(timezone.utc) + timedelta(days=7),
         resolved=False
     )
     test_db_session.add(market)

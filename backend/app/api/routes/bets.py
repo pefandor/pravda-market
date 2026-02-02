@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.db.models import User, Order, LedgerEntry, Market
@@ -281,7 +281,7 @@ def cancel_order(
     # 2. Update order status
     try:
         order.status = 'cancelled'
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
 
         # 3. Unlock funds (positive ledger entry)
         unlock_entry = LedgerEntry(

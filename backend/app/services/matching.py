@@ -17,7 +17,7 @@ from sqlalchemy import func
 from app.db.models import Order, Trade, LedgerEntry
 from app.services.validation import calculate_settlement
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 # DOS Protection: limit number of trades per order
 # Prevents attacker from creating 1000 micro-orders causing N+1 query problem
@@ -306,4 +306,4 @@ def update_order_status(order: Order):
     else:
         order.status = 'partial'
 
-    order.updated_at = datetime.utcnow()
+    order.updated_at = datetime.now(timezone.utc)

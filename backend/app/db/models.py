@@ -9,9 +9,14 @@ SQLAlchemy Models для Pravda Market
 """
 
 from sqlalchemy import Boolean, Column, Integer, String, DateTime, Text, BigInteger, ForeignKey, CheckConstraint, Index
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from datetime import datetime
+from sqlalchemy.orm import relationship, declarative_base
+from datetime import datetime, timezone
+
+
+def utcnow():
+    """Helper for timezone-aware UTC datetime (replaces deprecated utcnow)"""
+    return datetime.now(timezone.utc)
+
 
 Base = declarative_base()
 
@@ -29,8 +34,8 @@ class User(Base):
     telegram_id = Column(Integer, unique=True, index=True, nullable=False)
     username = Column(String(255), nullable=True)
     first_name = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationships
     orders = relationship("Order", back_populates="user")
@@ -68,8 +73,8 @@ class Market(Base):
     # Volume (для статистики)
     volume = Column(Integer, default=0)  # в копейках
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationships
     orders = relationship("Order", back_populates="market")
@@ -109,8 +114,8 @@ class Order(Base):
     amount_kopecks = Column(BigInteger, nullable=False)  # в копейках
     filled_kopecks = Column(BigInteger, default=0)
     status = Column(String(20), default='open', index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationships
     user = relationship("User", back_populates="orders")
@@ -153,7 +158,7 @@ class LedgerEntry(Base):
     amount_kopecks = Column(BigInteger, nullable=False)
     type = Column(String(30), nullable=False, index=True)
     reference_id = Column(BigInteger, nullable=True)  # order_id, trade_id
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     # Relationship
     user = relationship("User", back_populates="ledger_entries")
@@ -193,7 +198,7 @@ class Trade(Base):
     yes_cost_kopecks = Column(BigInteger, nullable=False)  # YES pays this
     no_cost_kopecks = Column(BigInteger, nullable=False)   # NO pays this
 
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=utcnow, index=True)
 
     # Constraints (CRITICAL - data integrity + settlement invariant)
     __table_args__ = (

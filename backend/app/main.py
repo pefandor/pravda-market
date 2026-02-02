@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
+from contextlib import asynccontextmanager
 import os
 
 from app.db.session import get_db, init_db
@@ -19,27 +20,15 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.rate_limit import limiter
 
-# Создаем FastAPI приложение
-app = FastAPI(
-    title="Pravda Market API",
-    description="Платформа коллективных прогнозов для российского рынка",
-    version="0.1.0",
-)
 
-# Add rate limiter
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-
-# Инициализация database при старте
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """
-    Выполняется при запуске приложения
+    Lifespan context manager - replaces deprecated on_event("startup")
 
-    Создает database tables если их нет
+    Выполняется при запуске и остановке приложения
     """
-    # Setup logging
+    # Startup: Setup logging and initialize database
     log_level = os.getenv("LOG_LEVEL", "INFO")
     json_logs = os.getenv("LOG_FORMAT", "text") == "json"
     setup_logging(level=log_level, json_format=json_logs)
@@ -53,6 +42,24 @@ async def startup_event():
     # Initialize database
     init_db()
     logger.info("Database initialized successfully")
+
+    yield
+
+    # Shutdown (if needed)
+    logger.info("Shutting down Pravda Market API")
+
+
+# Создаем FastAPI приложение с lifespan
+app = FastAPI(
+    title="Pravda Market API",
+    description="Платформа коллективных прогнозов для российского рынка",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+# Add rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS для frontend (Telegram Mini App)
 app.add_middleware(
