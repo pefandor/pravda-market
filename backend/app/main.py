@@ -15,7 +15,7 @@ import os
 
 from app.db.session import get_db, init_db
 from app.db.models import Market, Order
-from app.api.routes import users, bets, ledger
+from app.api.routes import users, bets, ledger, admin
 from app.core.logging_config import setup_logging, get_logger
 from app.core.config import settings
 from app.core.exceptions import (
@@ -85,6 +85,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(bets.router)
 app.include_router(ledger.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

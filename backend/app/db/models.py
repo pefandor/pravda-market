@@ -63,7 +63,9 @@ class Market(Base):
 
     # Резолюция
     resolved = Column(Boolean, default=False, index=True)
-    resolution_value = Column(Boolean, nullable=True)  # True=YES, False=NO, None=не резолвнут
+    resolution_value = Column(Boolean, nullable=True)  # True=YES, False=NO, None=не резолвнут (deprecated, use outcome)
+    outcome = Column(String(10), nullable=True)  # "yes" or "no" - which side won
+    resolved_at = Column(DateTime, nullable=True)  # When market was resolved
 
     # Временные поля для цен (в production это будет вычисляться из orderbook)
     # Для MVP - просто храним здесь

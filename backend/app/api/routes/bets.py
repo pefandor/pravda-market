@@ -225,15 +225,41 @@ def get_balance(
     total = get_user_balance(user.id, db)
     available = get_available_balance(user.id, db)  # Same as total in current implementation
 
-    # Calculate locked separately for display
-    # Sum all lock/unlock entries (order_lock, order_unlock, trade_lock)
-    # Locked = |negative sum| (locks are negative, unlocks are positive)
-    locked = db.query(func.sum(LedgerEntry.amount_kopecks)).filter(
-        LedgerEntry.user_id == user.id,
-        LedgerEntry.type.in_(['order_lock', 'order_unlock', 'trade_lock'])
-    ).scalar()
-    # locked is negative (e.g., -6500), so abs() gives locked amount
-    locked_amount = abs(locked) if locked else 0
+    # Calculate locked from open/partial orders
+    # This is more accurate than summing ledger entries
+    # Locked = unfilled amount in active orders + filled amount in unresolved trades
+    from app.db.models import Order, Trade, Market
+    from sqlalchemy import case
+
+    # Get locked in open/partial orders (not yet matched)
+    open_orders_locked = db.query(
+        func.sum(Order.amount_kopecks - Order.filled_kopecks)
+    ).filter(
+        Order.user_id == user.id,
+        Order.status.in_(['open', 'partial'])
+    ).scalar() or 0
+
+    # Get locked in filled trades for unresolved markets
+    # This represents money locked in active positions
+    trades_locked = db.query(
+        func.sum(
+            case(
+                (Order.side == 'yes', Trade.yes_cost_kopecks),
+                else_=Trade.no_cost_kopecks
+            )
+        )
+    ).join(
+        Order,
+        (Order.id == Trade.yes_order_id) | (Order.id == Trade.no_order_id)
+    ).join(
+        Market,
+        Market.id == Trade.market_id
+    ).filter(
+        Order.user_id == user.id,
+        Market.resolved == False  # Only unresolved markets
+    ).scalar() or 0
+
+    locked_amount = open_orders_locked + trades_locked
 
     return {
         "total_kopecks": total,
