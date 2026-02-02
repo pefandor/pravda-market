@@ -15,7 +15,7 @@ def test_get_orderbook_market_not_found(test_client, test_db_session):
     """Test 404 when market doesn't exist"""
     response = test_client.get("/markets/99999/orderbook")
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert "does not exist" in response.json()["detail"].lower()
 
 
 @pytest.mark.integration

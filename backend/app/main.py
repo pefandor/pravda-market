@@ -18,9 +18,15 @@ from app.db.models import Market, Order
 from app.api.routes import users, bets, ledger
 from app.core.logging_config import setup_logging, get_logger
 from app.core.config import settings
+from app.core.exceptions import (
+    APIException,
+    api_exception_handler,
+    http_exception_handler
+)
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.rate_limit import limiter
+from fastapi import HTTPException
 
 
 @asynccontextmanager
@@ -61,6 +67,10 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Add structured exception handlers
+app.add_exception_handler(APIException, api_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+
 # CORS для frontend (Telegram Mini App)
 # SECURITY: Restrict origins in production (configured via ALLOWED_ORIGINS env var)
 app.add_middleware(
@@ -78,7 +88,8 @@ app.include_router(ledger.router)
 
 
 @app.get("/")
-def root() -> Dict[str, str]:
+@limiter.limit("100/minute")
+def root(request: Request) -> Dict[str, str]:
     """
     Корневой endpoint - проверка что API работает
     """
@@ -94,7 +105,10 @@ def root() -> Dict[str, str]:
 @limiter.limit("60/minute")
 def health(request: Request) -> Dict[str, str]:
     """
-    Health check endpoint
+    Basic health check endpoint
+
+    Returns 200 if application is running.
+    Use for liveness probes.
     """
     return {
         "status": "healthy",
@@ -102,8 +116,51 @@ def health(request: Request) -> Dict[str, str]:
     }
 
 
+@app.get("/health/ready")
+@limiter.limit("60/minute")
+async def health_ready(request: Request, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Readiness check endpoint for Kubernetes
+
+    Verifies that application is ready to serve traffic:
+    - Database connection is working
+    - All dependencies are available
+
+    Returns:
+        200: Application is ready
+        503: Application is not ready (with details)
+
+    Use for readiness probes in K8s deployments.
+    """
+    from fastapi import HTTPException
+    from sqlalchemy import text
+
+    checks = {
+        "status": "ready",
+        "timestamp": datetime.now().isoformat(),
+        "checks": {}
+    }
+
+    # Check database connection
+    try:
+        db.execute(text("SELECT 1"))
+        checks["checks"]["database"] = "ok"
+    except Exception as e:
+        checks["status"] = "not_ready"
+        checks["checks"]["database"] = f"error: {str(e)}"
+        raise HTTPException(503, detail=checks)
+
+    # Add more checks here as needed
+    # - Redis connection (if using)
+    # - External API availability
+    # - File system access
+
+    return checks
+
+
 @app.get("/markets")
-async def get_markets(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+@limiter.limit("60/minute")
+async def get_markets(request: Request, db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
     """
     Получить список активных рынков из database
 
@@ -153,10 +210,10 @@ async def get_orderbook(
         - Only shows open/partial orders (not filled/cancelled)
     """
     # Check market exists
+    from app.core.exceptions import MarketNotFoundException
     market = db.query(Market).filter(Market.id == market_id).first()
     if not market:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Market not found")
+        raise MarketNotFoundException(market_id)
 
     # PERFORMANCE: Aggregate in SQL using GROUP BY (not Python)
     # Get YES orders aggregated by price level
