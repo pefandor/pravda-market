@@ -7,7 +7,7 @@ Endpoints для размещения ставок и управления ор�
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timezone
 
 from app.db.session import get_db
@@ -363,14 +363,19 @@ def get_trades(
         query = query.filter(Trade.market_id == market_id)
 
     # Get trades ordered by newest first
-    trades = query.order_by(Trade.created_at.desc()).limit(limit).all()
+    # PERFORMANCE: Use joinedload to prevent N+1 query
+    trades = query.options(
+        joinedload(Trade.yes_order),
+        joinedload(Trade.no_order)
+    ).order_by(Trade.created_at.desc()).limit(limit).all()
 
     # Format response
     result = []
     for trade in trades:
         # Determine user's side (YES or NO)
-        yes_order = db.query(Order).filter(Order.id == trade.yes_order_id).first()
-        no_order = db.query(Order).filter(Order.id == trade.no_order_id).first()
+        # PERFORMANCE: Use relationships instead of separate queries
+        yes_order = trade.yes_order
+        no_order = trade.no_order
 
         user_side = "yes" if yes_order.user_id == user.id else "no"
         user_cost = trade.yes_cost_kopecks if user_side == "yes" else trade.no_cost_kopecks

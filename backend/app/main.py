@@ -7,6 +7,7 @@ Pravda Market API - FastAPI Application
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
 from contextlib import asynccontextmanager
@@ -157,54 +158,37 @@ async def get_orderbook(
         from fastapi import HTTPException
         raise HTTPException(404, "Market not found")
 
-    # Get YES orders (open/partial only)
-    yes_orders = db.query(Order).filter(
+    # PERFORMANCE: Aggregate in SQL using GROUP BY (not Python)
+    # Get YES orders aggregated by price level
+    yes_results = db.query(
+        Order.price_bp,
+        func.sum(Order.amount_kopecks - Order.filled_kopecks).label('total_remaining')
+    ).filter(
         Order.market_id == market_id,
         Order.side == 'yes',
         Order.status.in_(['open', 'partial'])
-    ).all()
+    ).group_by(Order.price_bp).all()
 
-    # Get NO orders (open/partial only)
-    no_orders = db.query(Order).filter(
+    # Get NO orders aggregated by price level
+    no_results = db.query(
+        Order.price_bp,
+        func.sum(Order.amount_kopecks - Order.filled_kopecks).label('total_remaining')
+    ).filter(
         Order.market_id == market_id,
         Order.side == 'no',
         Order.status.in_(['open', 'partial'])
-    ).all()
-
-    # Aggregate YES orders by price (privacy protection)
-    yes_book = {}
-    for order in yes_orders:
-        price = order.price_decimal
-        remaining_kopecks = order.amount_kopecks - order.filled_kopecks
-        remaining_rubles = remaining_kopecks / 100
-
-        if price in yes_book:
-            yes_book[price] += remaining_rubles
-        else:
-            yes_book[price] = remaining_rubles
-
-    # Aggregate NO orders by price (privacy protection)
-    no_book = {}
-    for order in no_orders:
-        price = order.price_decimal
-        remaining_kopecks = order.amount_kopecks - order.filled_kopecks
-        remaining_rubles = remaining_kopecks / 100
-
-        if price in no_book:
-            no_book[price] += remaining_rubles
-        else:
-            no_book[price] = remaining_rubles
+    ).group_by(Order.price_bp).all()
 
     # Format response (sorted by best price first)
     return {
         "market_id": market_id,
         "yes_orders": [
-            {"price": price, "amount": amount}
-            for price, amount in sorted(yes_book.items(), reverse=True)
+            {"price": price_bp / 10000, "amount": total / 100}
+            for price_bp, total in sorted(yes_results, key=lambda x: x[0], reverse=True)
         ],
         "no_orders": [
-            {"price": price, "amount": amount}
-            for price, amount in sorted(no_book.items(), reverse=True)
+            {"price": price_bp / 10000, "amount": total / 100}
+            for price_bp, total in sorted(no_results, key=lambda x: x[0], reverse=True)
         ]
     }
 

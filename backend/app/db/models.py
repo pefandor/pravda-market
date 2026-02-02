@@ -200,6 +200,10 @@ class Trade(Base):
 
     created_at = Column(DateTime, default=utcnow, index=True)
 
+    # Relationships (for eager loading, prevents N+1 queries)
+    yes_order = relationship("Order", foreign_keys=[yes_order_id])
+    no_order = relationship("Order", foreign_keys=[no_order_id])
+
     # Constraints (CRITICAL - data integrity + settlement invariant)
     __table_args__ = (
         CheckConstraint('price_bp >= 0 AND price_bp <= 10000', name='trade_valid_price'),
@@ -208,8 +212,10 @@ class Trade(Base):
         CheckConstraint('no_cost_kopecks >= 0', name='trade_positive_no_cost'),
         # CRITICAL: Settlement invariant at database level!
         CheckConstraint('yes_cost_kopecks + no_cost_kopecks = amount_kopecks', name='trade_settlement_invariant'),
-        # Composite index for trade history queries
+        # Indexes for performance optimization
         Index('idx_trades_market_created', 'market_id', 'created_at'),
+        Index('idx_trades_yes_order', 'yes_order_id'),
+        Index('idx_trades_no_order', 'no_order_id'),
     )
 
     def __repr__(self):
