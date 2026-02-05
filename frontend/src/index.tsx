@@ -6,6 +6,7 @@ import { StrictMode } from 'react';
 import { retrieveLaunchParams } from '@tma.js/sdk-react';
 
 import { Root } from '@/components/Root.tsx';
+import { AdminRoot } from '@/components/AdminRoot.tsx';
 import { EnvUnsupported } from '@/components/EnvUnsupported.tsx';
 import { init } from '@/init.ts';
 
@@ -16,25 +17,38 @@ import './mockEnv.ts';
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 
-try {
-  const launchParams = retrieveLaunchParams();
-  const { tgWebAppPlatform: platform } = launchParams;
-  const debug = (launchParams.tgWebAppStartParam || '').includes('debug')
-    || import.meta.env.DEV;
+// Check if we're on admin route - render without Telegram SDK
+const isAdminRoute = window.location.hash.startsWith('#/admin');
 
-  // Configure all application dependencies.
-  await init({
-    debug,
-    eruda: debug && ['ios', 'android'].includes(platform),
-    mockForMacOS: platform === 'macos',
-  })
-    .then(() => {
-      root.render(
-        <StrictMode>
-          <Root/>
-        </StrictMode>,
-      );
-    });
-} catch (e) {
-  root.render(<EnvUnsupported/>);
+if (isAdminRoute) {
+  // Admin page works without Telegram SDK
+  root.render(
+    <StrictMode>
+      <AdminRoot />
+    </StrictMode>,
+  );
+} else {
+  // Normal Telegram Mini App flow
+  try {
+    const launchParams = retrieveLaunchParams();
+    const { tgWebAppPlatform: platform } = launchParams;
+    const debug = (launchParams.tgWebAppStartParam || '').includes('debug')
+      || import.meta.env.DEV;
+
+    // Configure all application dependencies.
+    await init({
+      debug,
+      eruda: debug && ['ios', 'android'].includes(platform),
+      mockForMacOS: platform === 'macos',
+    })
+      .then(() => {
+        root.render(
+          <StrictMode>
+            <Root/>
+          </StrictMode>,
+        );
+      });
+  } catch (e) {
+    root.render(<EnvUnsupported/>);
+  }
 }

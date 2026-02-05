@@ -8,7 +8,6 @@
 
 import { FC, useEffect, useState, useCallback } from 'react';
 import { Section, Cell, List, Spinner, Input, Button } from '@telegram-apps/telegram-ui';
-import { Page } from '@/components/Page';
 import {
   getAdminToken,
   setAdminToken,
@@ -134,7 +133,7 @@ export const AdminPage: FC = () => {
   // Login screen
   if (!isAuthenticated) {
     return (
-      <Page>
+      <div className="admin-page__wrapper">
         <div className="admin-page">
           <Section header="Admin Login">
             <div className="admin-page__login">
@@ -151,12 +150,12 @@ export const AdminPage: FC = () => {
             </div>
           </Section>
         </div>
-      </Page>
+      </div>
     );
   }
 
   return (
-    <Page>
+    <div className="admin-page__wrapper">
       <div className="admin-page">
         <h1 className="admin-page__title">Admin Panel</h1>
 
@@ -268,6 +267,6 @@ export const AdminPage: FC = () => {
           </>
         )}
       </div>
-    </Page>
+    </div>
   );
 };
