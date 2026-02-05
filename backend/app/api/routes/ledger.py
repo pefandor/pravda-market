@@ -62,13 +62,19 @@ def get_transactions(
     def get_description(entry: LedgerEntry) -> str:
         """Generate human-readable description"""
         if entry.type == 'deposit':
-            return f"Deposit: +{entry.amount_kopecks/100:.2f}₽"
+            return f"Пополнение: +{entry.amount_kopecks/100:.2f}₽"
         elif entry.type == 'order_lock':
-            return f"Locked for order #{entry.reference_id}"
+            return f"Заблокировано для ордера #{entry.reference_id}"
         elif entry.type == 'order_unlock':
-            return f"Unlocked from order #{entry.reference_id}"
+            return f"Разблокировано от ордера #{entry.reference_id}"
         elif entry.type == 'trade':
-            return f"Trade execution #{entry.reference_id}"
+            return f"Исполнение сделки #{entry.reference_id}"
+        elif entry.type == 'trade_lock':
+            return f"Заблокировано в сделке #{entry.reference_id}"
+        elif entry.type == 'payout':
+            return f"Выигрыш: +{entry.amount_kopecks/100:.2f}₽"
+        elif entry.type == 'fee':
+            return f"Комиссия платформы (2%)"
         else:
             return f"{entry.type.title()}"
 

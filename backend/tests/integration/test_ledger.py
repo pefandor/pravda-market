@@ -49,7 +49,7 @@ def test_get_transactions_deposit_only(test_client, test_db_session, sample_user
     assert data[0]["type"] == "deposit"
     assert data[0]["amount_rubles"] == 1000.0
     assert data[0]["reference_id"] is None
-    assert "Deposit: +1000.00₽" in data[0]["description"]
+    assert "Пополнение: +1000.00₽" in data[0]["description"]
 
 
 @pytest.mark.integration
@@ -337,14 +337,14 @@ def test_get_transactions_description_formats(test_client, test_db_session, samp
     assert response.status_code == 200
     data = response.json()
 
-    # Find each type and verify description
+    # Find each type and verify description (Russian descriptions)
     types_found = {t["type"]: t["description"] for t in data}
 
     assert "deposit" in types_found
-    assert "Deposit: +1000.00₽" in types_found["deposit"]
+    assert "Пополнение: +1000.00₽" in types_found["deposit"]
 
     assert "order_lock" in types_found
-    assert f"Locked for order #{order.id}" == types_found["order_lock"]
+    assert f"Заблокировано для ордера #{order.id}" == types_found["order_lock"]
 
     assert "order_unlock" in types_found
-    assert f"Unlocked from order #{order.id}" == types_found["order_unlock"]
+    assert f"Разблокировано от ордера #{order.id}" == types_found["order_unlock"]

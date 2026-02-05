@@ -53,20 +53,9 @@ def test_full_trading_journey_end_to_end(test_client, test_db_session):
         assert response.status_code == 200, f"{name} registration failed"
         print(f"   ✅ {name} registered")
 
-    # === Step 2: Initial Balance ===
-    print("💰 Step 2: Giving users initial balance...")
-    alice = test_db_session.query(User).filter(User.telegram_id == 5001).first()
-    bob = test_db_session.query(User).filter(User.telegram_id == 5002).first()
-
-    for user, name in [(alice, 'Alice'), (bob, 'Bob')]:
-        test_db_session.add(LedgerEntry(
-            user_id=user.id,
-            amount_kopecks=100_000,  # 1000₽
-            type='deposit',
-            reference_id=user.id
-        ))
-    test_db_session.commit()
-    print("   ✅ Both users have 1000₽ balance")
+    # === Step 2: Initial Balance (Welcome Bonus) ===
+    print("💰 Step 2: Verifying welcome bonus (auto-credited on registration)...")
+    # NOTE: Users already have 1000₽ from welcome bonus
 
     # Verify balances
     for init_data, name in [(init_data_alice, 'Alice'), (init_data_bob, 'Bob')]:
@@ -74,7 +63,8 @@ def test_full_trading_journey_end_to_end(test_client, test_db_session):
             headers={"Authorization": f"twa {init_data}"}
         )
         balance = response.json()
-        assert balance["available_rubles"] == 1000, f"{name} should have 1000₽"
+        assert balance["available_rubles"] == 1000, f"{name} should have 1000₽ (welcome bonus)"
+    print("   ✅ Both users have 1000₽ balance from welcome bonus")
 
     # === Step 3: Create Market ===
     print("📊 Step 3: Creating market...")
@@ -211,16 +201,16 @@ def test_full_trading_journey_end_to_end(test_client, test_db_session):
     # === Step 12: Check Final Balances (After Payout) ===
     print("💰 Step 12: Checking final balances after payout...")
 
-    # Alice (YES winner): paid 60₽, gets 100₽ payout → net +40₽ profit
-    # Final: 1000₽ + 40₽ = 1040₽
+    # Alice (YES winner): paid 60₽, gets 100₽ payout - 2₽ fee → net +38₽ profit
+    # Final: 1000₽ + 38₽ = 1038₽
     response = test_client.get("/bets/balance",
         headers={"Authorization": f"twa {init_data_alice}"}
     )
     alice_final = response.json()
-    assert alice_final["available_rubles"] == 1040, \
-        f"Alice (winner) should have 1040₽, got {alice_final['available_rubles']}"
+    assert alice_final["available_rubles"] == 1038, \
+        f"Alice (winner) should have 1038₽ (with 2% fee), got {alice_final['available_rubles']}"
     assert alice_final["locked_rubles"] == 0, "No locked funds after resolution"
-    print(f"   ✅ Alice (winner): 1040₽ (net +40₽ profit)")
+    print(f"   ✅ Alice (winner): 1038₽ (net +38₽ profit after 2% fee)")
 
     # Bob (NO loser): paid 40₽, gets 0₽ → net -40₽ loss
     # Final: 1000₽ - 40₽ = 960₽
@@ -235,19 +225,19 @@ def test_full_trading_journey_end_to_end(test_client, test_db_session):
 
     # === Step 13: Final Ledger Invariant Check ===
     print("Step 13: Final ledger invariant verification...")
-    # After resolution, all locks should be settled and winners/losers determined
-    # The invariant: total deposits = sum of all ledger entries (no locks remain)
+    # After resolution, ledger total = deposits - platform fees
     total_after_resolution = test_db_session.query(
         func.sum(LedgerEntry.amount_kopecks)
     ).scalar() or 0
 
-    # After resolution, ledger total should equal deposits (no more locks, payouts distributed)
-    # Alice: +100k deposit + 100k payout - 60k trade_lock = +140k
-    # Bob: +100k deposit - 40k trade_lock = +60k
-    # Total: 200k (deposits preserved!)
-    assert total_after_resolution == total_deposits, \
-        f"Ledger invariant violated after resolution! Expected: {total_deposits}, Got: {total_after_resolution}"
-    print("   Ledger invariant preserved throughout entire flow")
+    # After resolution with 2% fee:
+    # Alice: +100k (deposit) - 60k (trade_lock) + 100k (payout) - 2k (fee) = 138k
+    # Bob: +100k (deposit) - 40k (trade_lock) = 60k
+    # Total: 198k (deposits minus 2k fee = 200k - 2k)
+    expected_total = total_deposits - 200  # 2₽ fee = 200 kopecks
+    assert total_after_resolution == expected_total, \
+        f"Ledger invariant violated! Expected: {expected_total} (deposits - fee), Got: {total_after_resolution}"
+    print(f"   ✅ Ledger invariant preserved (deposits - 2% fee)")
 
     # === Step 14: Verify Cannot Trade After Resolution ===
     print("🚫 Step 14: Verifying trading blocked after resolution...")
@@ -292,21 +282,13 @@ def test_order_cancellation_journey(test_client, test_db_session):
     """
     print("\n🔄 Testing Order Cancellation Journey...")
 
-    # Setup user
+    # Setup user (gets 1000₽ welcome bonus on registration)
     init_data = create_mock_init_data(6001, 'charlie', 'Charlie')
     response = test_client.get("/bets/balance",
         headers={"Authorization": f"twa {init_data}"}
     )
     assert response.status_code == 200
-
-    user = test_db_session.query(User).filter(User.telegram_id == 6001).first()
-    test_db_session.add(LedgerEntry(
-        user_id=user.id,
-        amount_kopecks=100_000,
-        type='deposit',
-        reference_id=user.id
-    ))
-    test_db_session.commit()
+    # NOTE: User already has 1000₽ from welcome bonus
 
     # Create market
     market = Market(

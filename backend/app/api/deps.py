@@ -8,11 +8,14 @@ from fastapi import Header, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.db.models import User
+from app.db.models import User, LedgerEntry
 from app.core.security import validate_telegram_init_data
 from app.core.logging_config import get_logger
 
 logger = get_logger()
+
+# Welcome bonus for new users (in rubles)
+WELCOME_BONUS_RUBLES = 1000
 
 
 def get_current_user(
@@ -80,11 +83,22 @@ def get_current_user(
         db.commit()
         db.refresh(user)
 
-        logger.info("New user auto-registered", extra={
+        # Credit welcome bonus (1000₽)
+        welcome_bonus_kopecks = WELCOME_BONUS_RUBLES * 100
+        db.add(LedgerEntry(
+            user_id=user.id,
+            amount_kopecks=welcome_bonus_kopecks,
+            type='deposit',
+            reference_id=None
+        ))
+        db.commit()
+
+        logger.info("New user auto-registered with welcome bonus", extra={
             "telegram_id": user.telegram_id,
             "username": user.username,
             "first_name": user.first_name,
-            "user_id": user.id
+            "user_id": user.id,
+            "welcome_bonus_rubles": WELCOME_BONUS_RUBLES
         })
     else:
         logger.debug("Existing user authenticated", extra={

@@ -5,8 +5,9 @@ CRITICAL: This module handles financial settlement.
 Ledger invariant MUST be preserved: total sum of ledger entries remains constant.
 
 Settlement Logic:
-- Winner: Gets payout (100 kopecks per share), trade_lock stays (their cost)
+- Winner: Gets payout (100 kopecks per share) MINUS 2% fee, trade_lock stays (their cost)
 - Loser: Gets nothing, trade_lock stays (they lose it)
+- Platform: Collects 2% fee from winner's payout
 
 Example for 100₽ trade at YES @ 65%:
 - YES cost: 65₽ (locked in trade_lock = -6500)
@@ -14,14 +15,16 @@ Example for 100₽ trade at YES @ 65%:
 - Total pot: 100₽
 
 If YES wins:
-- YES: payout +100₽, trade_lock stays -65₽ = net +35₽ profit ✅
+- Fee: 2₽ (2% of 100₽)
+- YES: payout +98₽, trade_lock stays -65₽ = net +33₽ profit ✅
 - NO: payout 0₽, trade_lock stays -35₽ = net -35₽ loss ✅
-- Ledger: +10000 (payout) - 6500 (YES lock) - 3500 (NO lock) = 0 ✅ (invariant!)
+- Platform: +2₽ fee ✅
 
 If NO wins:
-- NO: payout +100₽, trade_lock stays -35₽ = net +65₽ profit ✅
+- Fee: 2₽ (2% of 100₽)
+- NO: payout +98₽, trade_lock stays -35₽ = net +63₽ profit ✅
 - YES: payout 0₽, trade_lock stays -65₽ = net -65₽ loss ✅
-- Ledger: +10000 (payout) - 3500 (NO lock) - 6500 (YES lock) = 0 ✅ (invariant!)
+- Platform: +2₽ fee ✅
 """
 
 from sqlalchemy.orm import Session
@@ -33,6 +36,10 @@ from app.db.models import Market, Trade, Order, LedgerEntry
 from app.core.logging_config import get_logger
 
 logger = get_logger()
+
+# Platform fee rate (2% = 0.02)
+# Fee is deducted from winner's payout
+PLATFORM_FEE_RATE = 0.02
 
 
 def settle_market(market_id: int, outcome: str, db: Session) -> Dict[str, Any]:
@@ -89,23 +96,31 @@ def settle_market(market_id: int, outcome: str, db: Session) -> Dict[str, Any]:
     winners_paid = 0
     losers_count = 0
     total_payout_kopecks = 0
+    total_fees_kopecks = 0
 
     # Settle each trade
     for trade in trades:
+        # Calculate fee (2% of pot)
+        fee_kopecks = int(trade.amount_kopecks * PLATFORM_FEE_RATE)
+        # Gross payout = full pot, fee deducted separately for transparency
+        gross_payout = trade.amount_kopecks
+
         if outcome == 'yes':
             # YES wins, NO loses
-            settle_winner(trade.yes_order_id, trade.amount_kopecks, trade.id, db)
+            settle_winner(trade.yes_order_id, gross_payout, fee_kopecks, trade.id, db)
             settle_loser(trade.no_order_id, trade.id, db)
             winners_paid += 1
             losers_count += 1
-            total_payout_kopecks += trade.amount_kopecks
+            total_payout_kopecks += gross_payout - fee_kopecks  # Net payout for stats
+            total_fees_kopecks += fee_kopecks
         else:  # outcome == 'no'
             # NO wins, YES loses
-            settle_winner(trade.no_order_id, trade.amount_kopecks, trade.id, db)
+            settle_winner(trade.no_order_id, gross_payout, fee_kopecks, trade.id, db)
             settle_loser(trade.yes_order_id, trade.id, db)
             winners_paid += 1
             losers_count += 1
-            total_payout_kopecks += trade.amount_kopecks
+            total_payout_kopecks += gross_payout - fee_kopecks  # Net payout for stats
+            total_fees_kopecks += fee_kopecks
 
     # Update market status (row already locked)
     market.resolved = True
@@ -116,9 +131,10 @@ def settle_market(market_id: int, outcome: str, db: Session) -> Dict[str, Any]:
     # Flush pending changes to DB so we can query them
     db.flush()
 
-    # Verify: total payouts created == total trade amounts for this market
+    # Verify: payout + fee entries sum correctly
     trade_ids = [t.id for t in trades]
     if trade_ids:
+        # Sum of gross payouts (should equal sum of trade amounts)
         actual_payout_sum = db.query(
             func.sum(LedgerEntry.amount_kopecks)
         ).filter(
@@ -126,16 +142,40 @@ def settle_market(market_id: int, outcome: str, db: Session) -> Dict[str, Any]:
             LedgerEntry.reference_id.in_(trade_ids)
         ).scalar() or 0
 
-        if actual_payout_sum != total_payout_kopecks:
+        # Sum of fees (should equal total_fees_kopecks, but negative)
+        actual_fee_sum = db.query(
+            func.sum(LedgerEntry.amount_kopecks)
+        ).filter(
+            LedgerEntry.type == 'fee',
+            LedgerEntry.reference_id.in_(trade_ids)
+        ).scalar() or 0
+
+        # Expected: payout (gross) - fee = net payout
+        expected_gross_payout = total_payout_kopecks + total_fees_kopecks
+        expected_fee = -total_fees_kopecks
+
+        if actual_payout_sum != expected_gross_payout:
             db.rollback()
-            logger.critical("LEDGER INVARIANT VIOLATED in settlement!", extra={
+            logger.critical("LEDGER INVARIANT VIOLATED in settlement (payout)!", extra={
                 "market_id": market_id,
-                "expected_payout": total_payout_kopecks,
+                "expected_gross_payout": expected_gross_payout,
                 "actual_payout": actual_payout_sum,
             })
             raise ValueError(
-                f"Ledger invariant violated! Expected payout {total_payout_kopecks}, "
+                f"Ledger invariant violated! Expected gross payout {expected_gross_payout}, "
                 f"got {actual_payout_sum}"
+            )
+
+        if actual_fee_sum != expected_fee:
+            db.rollback()
+            logger.critical("LEDGER INVARIANT VIOLATED in settlement (fee)!", extra={
+                "market_id": market_id,
+                "expected_fee": expected_fee,
+                "actual_fee": actual_fee_sum,
+            })
+            raise ValueError(
+                f"Ledger invariant violated! Expected fee {expected_fee}, "
+                f"got {actual_fee_sum}"
             )
 
     # NOTE: Caller is responsible for db.commit() — gives route handler control
@@ -146,39 +186,47 @@ def settle_market(market_id: int, outcome: str, db: Session) -> Dict[str, Any]:
         "outcome": outcome,
         "winners_paid": winners_paid,
         "losers_count": losers_count,
-        "total_payout_rubles": total_payout_kopecks / 100
+        "total_payout_rubles": total_payout_kopecks / 100,
+        "total_fees_rubles": total_fees_kopecks / 100,
+        "fee_rate": f"{PLATFORM_FEE_RATE:.0%}"
     })
 
     return {
         "winners_paid": winners_paid,
         "losers_count": losers_count,
-        "total_payout_rubles": total_payout_kopecks / 100
+        "total_payout_rubles": total_payout_kopecks / 100,
+        "total_fees_rubles": total_fees_kopecks / 100,
+        "fee_rate_percent": PLATFORM_FEE_RATE * 100
     }
 
 
-def settle_winner(order_id: int, payout_amount: int, trade_id: int, db: Session):
+def settle_winner(order_id: int, gross_payout: int, fee_amount: int, trade_id: int, db: Session):
     """
     Settle winner's position
 
     Winner receives:
-    - Payout of full pot (100 kopecks per share)
+    - Gross payout (full pot) as positive entry
+    - Fee deducted as separate negative entry (for transparency)
     - trade_lock stays locked (it's their cost that went into the pot)
 
-    Net effect: -cost (from trade_lock) + payout = profit
+    Net effect: -cost (from trade_lock) + payout - fee = profit
 
-    Example:
+    Example (100₽ pot, 2% fee):
     - YES paid 65₽ (trade_lock = -6500, stays)
     - Payout: 100₽ (+10000)
-    - Net: -6500 + 10000 = +3500 (35₽ profit) ✅
+    - Fee: -2₽ (-200)
+    - Net: -6500 + 10000 - 200 = +3300 (33₽ profit) ✅
 
     Args:
         order_id: ID of winning order
-        payout_amount: Amount to pay out (in kopecks) = full pot
+        gross_payout: Gross payout amount (in kopecks) = full pot
+        fee_amount: Fee deducted (in kopecks) = pot * 2%
         trade_id: ID of trade being settled
         db: Database session
 
     Side effects:
-        - Creates 'payout' ledger entry (positive)
+        - Creates 'payout' ledger entry (positive, gross amount)
+        - Creates 'fee' ledger entry (negative, platform takes this)
         - trade_lock stays as-is (negative, represents their cost)
     """
     # Get order to find user_id
@@ -187,20 +235,30 @@ def settle_winner(order_id: int, payout_amount: int, trade_id: int, db: Session)
         logger.error("Order not found for settlement", extra={"order_id": order_id})
         raise ValueError(f"Order {order_id} not found")
 
-    # DON'T unlock trade_lock - it represents their cost
-    # Just add payout (full contract value = pot)
+    # Add gross payout (full pot)
     db.add(LedgerEntry(
         user_id=order.user_id,
-        amount_kopecks=payout_amount,
+        amount_kopecks=gross_payout,
         type='payout',
         reference_id=trade_id
     ))
+
+    # Record fee (negative for user, platform revenue)
+    if fee_amount > 0:
+        db.add(LedgerEntry(
+            user_id=order.user_id,
+            amount_kopecks=-fee_amount,
+            type='fee',
+            reference_id=trade_id
+        ))
 
     logger.debug("Winner settled", extra={
         "user_id": order.user_id,
         "order_id": order_id,
         "trade_id": trade_id,
-        "payout_kopecks": payout_amount
+        "gross_payout_kopecks": gross_payout,
+        "fee_kopecks": fee_amount,
+        "net_payout_kopecks": gross_payout - fee_amount
     })
 
 

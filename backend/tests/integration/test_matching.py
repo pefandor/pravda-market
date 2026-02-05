@@ -64,20 +64,7 @@ def test_exact_match_end_to_end(test_client, test_db_session):
     user_a = test_db_session.query(User).filter(User.telegram_id == 111).first()
     user_b = test_db_session.query(User).filter(User.telegram_id == 222).first()
 
-    # Add deposits to ledger
-    test_db_session.add(LedgerEntry(
-        user_id=user_a.id,
-        amount_kopecks=100000,
-        type='deposit',
-        reference_id=1
-    ))
-    test_db_session.add(LedgerEntry(
-        user_id=user_b.id,
-        amount_kopecks=100000,
-        type='deposit',
-        reference_id=2
-    ))
-    test_db_session.commit()
+    # NOTE: Users already have 1000₽ each from welcome bonus (auto-credited on registration)
 
     # CRITICAL: Check ledger invariant BEFORE matching
     total_before = test_db_session.query(
@@ -86,7 +73,8 @@ def test_exact_match_end_to_end(test_client, test_db_session):
         LedgerEntry.type.in_(['deposit', 'withdrawal'])
     ).scalar() or 0
 
-    assert total_before == 200000, "Initial deposits should be 200000 kopecks"
+    # 2 users × 1000₽ welcome bonus = 200000 kopecks
+    assert total_before == 200000, "Initial deposits (welcome bonus) should be 200000 kopecks"
 
     # User A: YES @ 6500bp (65%) for 100₽
     response_a = test_client.post("/bets",

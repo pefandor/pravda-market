@@ -13,10 +13,11 @@ from datetime import datetime, timezone
 import hmac
 
 from app.db.session import get_db
-from app.db.models import Market
+from app.db.models import Market, User, LedgerEntry
 from app.core.rate_limit import limiter
 from app.core.logging_config import get_logger
 from app.core.config import settings
+from sqlalchemy import func
 
 router = APIRouter(
     prefix="/admin",
@@ -37,6 +38,31 @@ class ResolveRequest(BaseModel):
             }
         }
     )
+
+
+class DepositRequest(BaseModel):
+    """Request body for admin deposit"""
+    amount: float = Field(..., gt=0, le=100000, description="Amount in rubles (max 100,000)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "amount": 1000
+            }
+        }
+    )
+
+
+class UserResponse(BaseModel):
+    """Response for user info"""
+    id: int
+    telegram_id: int
+    username: Optional[str]
+    first_name: Optional[str]
+    balance_rubles: float
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CreateMarketRequest(BaseModel):
@@ -329,3 +355,106 @@ async def resolve_market(
             status_code=500,
             detail="Failed to resolve market. Please check server logs."
         )
+
+
+# ============================================================================
+# USER MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@router.get("/users", response_model=List[UserResponse])
+@limiter.limit("30/minute")
+async def list_all_users(
+    request: Request,
+    db: Session = Depends(get_db),
+    is_admin: bool = Depends(get_admin_user)
+) -> List[UserResponse]:
+    """
+    List all users with their balances
+
+    Admin-only endpoint for viewing all users.
+    """
+    users = db.query(User).order_by(User.id.desc()).all()
+
+    result = []
+    for user in users:
+        # Calculate balance from ledger
+        balance = db.query(func.sum(LedgerEntry.amount_kopecks)).filter(
+            LedgerEntry.user_id == user.id
+        ).scalar() or 0
+
+        result.append(UserResponse(
+            id=user.id,
+            telegram_id=user.telegram_id,
+            username=user.username,
+            first_name=user.first_name,
+            balance_rubles=balance / 100,
+            created_at=user.created_at
+        ))
+
+    return result
+
+
+@router.post("/users/{telegram_id}/deposit", response_model=Dict[str, Any])
+@limiter.limit("30/minute")
+async def admin_deposit(
+    request: Request,
+    telegram_id: int,
+    deposit_request: DepositRequest,
+    db: Session = Depends(get_db),
+    is_admin: bool = Depends(get_admin_user)
+) -> Dict[str, Any]:
+    """
+    Add funds to user's balance (admin deposit)
+
+    Admin-only endpoint for crediting user accounts.
+
+    Args:
+        telegram_id: User's Telegram ID
+        deposit_request: Contains amount in rubles
+
+    Returns:
+        Success message with new balance
+
+    Raises:
+        403: If not admin
+        404: If user not found
+    """
+    # Find user by telegram_id
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail=f"User with telegram_id {telegram_id} not found"
+        )
+
+    # Convert rubles to kopecks
+    amount_kopecks = int(deposit_request.amount * 100)
+
+    # Create deposit ledger entry
+    db.add(LedgerEntry(
+        user_id=user.id,
+        amount_kopecks=amount_kopecks,
+        type='deposit',
+        reference_id=None
+    ))
+    db.commit()
+
+    # Calculate new balance
+    new_balance = db.query(func.sum(LedgerEntry.amount_kopecks)).filter(
+        LedgerEntry.user_id == user.id
+    ).scalar() or 0
+
+    logger.info("Admin deposit completed", extra={
+        "telegram_id": telegram_id,
+        "user_id": user.id,
+        "amount_rubles": deposit_request.amount,
+        "new_balance_rubles": new_balance / 100
+    })
+
+    return {
+        "success": True,
+        "telegram_id": telegram_id,
+        "user_id": user.id,
+        "deposited_rubles": deposit_request.amount,
+        "new_balance_rubles": new_balance / 100
+    }

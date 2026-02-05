@@ -49,15 +49,7 @@ def test_resolve_market_yes_wins(test_client, test_db_session):
     test_db_session.add(market)
     test_db_session.commit()
 
-    # Give users balance (1000₽ each)
-    for user in [user_a, user_b]:
-        test_db_session.add(LedgerEntry(
-            user_id=user.id,
-            amount_kopecks=100000,  # 1000₽
-            type='deposit',
-            reference_id=user.id
-        ))
-    test_db_session.commit()
+    # NOTE: Users already have 1000₽ from welcome bonus (auto-credited on registration)
 
     # CRITICAL: Check ledger BEFORE trading and resolution
     total_before = test_db_session.query(
@@ -140,10 +132,10 @@ def test_resolve_market_yes_wins(test_client, test_db_session):
     )
     balance_a_after = response_balance_a.json()
 
-    # User A wins: gets back 65₽ + payout 100₽ = net +35₽ profit
-    # Total: 1000₽ + 35₽ = 1035₽
-    assert balance_a_after["available_rubles"] == 1035, \
-        f"YES winner should have 1035₽, got {balance_a_after['available_rubles']}"
+    # User A wins: payout 98₽ (100₽ - 2% fee) - 65₽ cost = net +33₽ profit
+    # Total: 1000₽ + 33₽ = 1033₽
+    assert balance_a_after["available_rubles"] == 1033, \
+        f"YES winner should have 1033₽ (with 2% fee), got {balance_a_after['available_rubles']}"
     assert balance_a_after["locked_rubles"] == 0, "No locked funds after resolution"
 
     # Check NO user balance (should decrease - they lost!)
@@ -152,19 +144,21 @@ def test_resolve_market_yes_wins(test_client, test_db_session):
     )
     balance_b_after = response_balance_b.json()
 
-    # User B loses: gets back 35₽, loses the pot = net -35₽ loss
+    # User B loses: loses 35₽ stake = net -35₽ loss
     # Total: 1000₽ - 35₽ = 965₽
     assert balance_b_after["available_rubles"] == 965, \
         f"NO loser should have 965₽, got {balance_b_after['available_rubles']}"
     assert balance_b_after["locked_rubles"] == 0, "No locked funds after resolution"
 
-    # CRITICAL: Verify ledger invariant preserved
+    # CRITICAL: Verify ledger invariant (deposits - fees preserved)
     total_after = test_db_session.query(
         func.sum(LedgerEntry.amount_kopecks)
     ).scalar() or 0
 
-    assert total_before == total_after, \
-        f"Ledger invariant violated! Before: {total_before}, After: {total_after}"
+    # With 2% fee on 100₽ pot = 2₽ fee = 200 kopecks
+    expected_after = total_before - 200
+    assert total_after == expected_after, \
+        f"Ledger invariant violated! Expected: {expected_after} (before - fee), After: {total_after}"
 
     # Verify cannot trade after resolution
     response = test_client.post("/bets",
@@ -212,15 +206,7 @@ def test_resolve_market_no_wins(test_client, test_db_session):
     test_db_session.add(market)
     test_db_session.commit()
 
-    # Give users balance
-    for user in [user_a, user_b]:
-        test_db_session.add(LedgerEntry(
-            user_id=user.id,
-            amount_kopecks=100000,
-            type='deposit',
-            reference_id=user.id
-        ))
-    test_db_session.commit()
+    # NOTE: Users already have 1000₽ from welcome bonus (auto-credited on registration)
 
     # Check ledger before
     total_before = test_db_session.query(
@@ -271,7 +257,7 @@ def test_resolve_market_no_wins(test_client, test_db_session):
     )
     balance_a_after = response_balance_a.json()
 
-    # User A loses: paid 70₽, gets back 70₽ = net -70₽ loss
+    # User A loses: loses 70₽ stake = net -70₽ loss
     # Total: 1000₽ - 70₽ = 930₽
     assert balance_a_after["available_rubles"] == 930, \
         f"YES loser should have 930₽, got {balance_a_after['available_rubles']}"
@@ -282,18 +268,20 @@ def test_resolve_market_no_wins(test_client, test_db_session):
     )
     balance_b_after = response_balance_b.json()
 
-    # User B wins: paid 30₽, gets back 30₽ + 100₽ payout = net +70₽ profit
-    # Total: 1000₽ + 70₽ = 1070₽
-    assert balance_b_after["available_rubles"] == 1070, \
-        f"NO winner should have 1070₽, got {balance_b_after['available_rubles']}"
+    # User B wins: payout 98₽ (100₽ - 2% fee) - 30₽ cost = net +68₽ profit
+    # Total: 1000₽ + 68₽ = 1068₽
+    assert balance_b_after["available_rubles"] == 1068, \
+        f"NO winner should have 1068₽ (with 2% fee), got {balance_b_after['available_rubles']}"
 
-    # CRITICAL: Ledger invariant
+    # CRITICAL: Ledger invariant (deposits - fees preserved)
     total_after = test_db_session.query(
         func.sum(LedgerEntry.amount_kopecks)
     ).scalar() or 0
 
-    assert total_before == total_after, \
-        f"Ledger invariant violated! Before: {total_before}, After: {total_after}"
+    # With 2% fee on 100₽ pot = 2₽ fee = 200 kopecks
+    expected_after = total_before - 200
+    assert total_after == expected_after, \
+        f"Ledger invariant violated! Expected: {expected_after} (before - fee), After: {total_after}"
 
 
 @pytest.mark.integration

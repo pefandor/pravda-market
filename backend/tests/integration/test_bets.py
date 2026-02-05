@@ -12,7 +12,7 @@ from app.core.security import create_mock_init_data
 
 @pytest.mark.integration
 def test_get_balance_no_deposits(test_client, test_db_session):
-    """Test GET /bets/balance with no deposits"""
+    """Test GET /bets/balance for new user (gets welcome bonus)"""
     init_data = create_mock_init_data(user_id=1001)
 
     response = test_client.get(
@@ -22,8 +22,9 @@ def test_get_balance_no_deposits(test_client, test_db_session):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["total_rubles"] == 0
-    assert data["available_rubles"] == 0
+    # New users get 1000₽ welcome bonus
+    assert data["total_rubles"] == 1000.0
+    assert data["available_rubles"] == 1000.0
     assert data["locked_rubles"] == 0
 
 
