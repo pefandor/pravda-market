@@ -1,5 +1,10 @@
+/* ========================================
+   USER PROFILE PAGE - Premium Design
+   ======================================== */
+
 .user-profile-page {
   padding-bottom: 24px;
+  animation: pm-fade-in 0.3s ease;
 }
 
 .user-profile-page__loading {
@@ -7,77 +12,160 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  gap: 16px;
+  padding: 80px 20px;
+  gap: 20px;
   color: var(--tg-theme-hint-color);
 }
 
+.user-profile-page__loading p {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* ----- Retry Button ----- */
 .user-profile-page__retry {
-  background-color: var(--tg-theme-button-color);
-  color: var(--tg-theme-button-text-color);
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  color: white;
   border: none;
-  border-radius: 12px;
-  padding: 12px 24px;
+  border-radius: var(--pm-radius-lg, 16px);
+  padding: 14px 28px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
 }
 
 .user-profile-page__retry:hover {
-  opacity: 0.8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.4);
 }
 
+.user-profile-page__retry:active {
+  transform: scale(0.98);
+}
+
+/* ----- Header ----- */
 .user-profile-page__header {
-  padding: 20px 16px 16px;
+  padding: 24px 16px 20px;
+  text-align: center;
 }
 
 .user-profile-page__title {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 6px 0;
   color: var(--tg-theme-text-color);
+  letter-spacing: -0.5px;
 }
 
 .user-profile-page__username {
-  font-size: 15px;
-  color: var(--tg-theme-hint-color);
+  font-size: 16px;
+  color: var(--pm-accent-primary, #6366F1);
   margin: 0;
+  font-weight: 600;
 }
 
+/* ----- Balance Card ----- */
 .user-profile-page__balance {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 16px;
-  background: linear-gradient(135deg, var(--tg-theme-button-color), var(--tg-theme-link-color));
-  border-radius: 16px;
-  margin: 0 16px 16px;
+  padding: 32px 24px;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #A855F7 100%);
+  border-radius: var(--pm-radius-xl, 20px);
+  margin: 0 16px 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+}
+
+/* Decorative elements */
+.user-profile-page__balance::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -15%;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.user-profile-page__balance::after {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: -10%;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  border-radius: 50%;
 }
 
 .user-profile-page__balance-label {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
   margin-bottom: 8px;
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  z-index: 1;
 }
 
 .user-profile-page__balance-amount {
-  font-size: 36px;
-  font-weight: 700;
+  font-size: 44px;
+  font-weight: 800;
   color: white;
-  font-family: 'Courier New', monospace;
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.2);
 }
 
+/* ----- Transaction Amount ----- */
 .user-profile-page__amount {
-  font-weight: 600;
-  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
 }
 
 .user-profile-page__amount.positive {
-  color: #4caf50;
+  color: var(--pm-yes-color, #10B981);
 }
 
 .user-profile-page__amount.negative {
-  color: #f44336;
+  color: var(--pm-no-color, #EF4444);
+}
+
+/* ----- TON Connect Section ----- */
+.user-profile-page [class*="Section"] {
+  margin: 0 16px;
+}
+
+/* Style the Cell items */
+.user-profile-page [class*="Cell"] {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--pm-radius-lg, 16px);
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+
+.user-profile-page [class*="Cell"]:active {
+  transform: scale(0.98);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+/* ----- Transaction History Section ----- */
+.user-profile-page [class*="Section"]:last-of-type [class*="List"] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.user-profile-page [class*="Section"]:last-of-type [class*="Cell"] {
+  margin-bottom: 0;
 }

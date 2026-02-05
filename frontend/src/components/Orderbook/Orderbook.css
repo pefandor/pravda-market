@@ -1,12 +1,22 @@
+/* ========================================
+   ORDERBOOK - Premium Trading UI
+   ======================================== */
+
 .orderbook {
-  margin: 16px 0;
+  margin: 20px 0;
+  padding: 0 16px;
 }
 
 .orderbook__container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 16px;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--pm-radius-xl, 20px);
+  padding: 20px;
 }
 
 .orderbook__side {
@@ -14,65 +24,107 @@
   flex-direction: column;
 }
 
+/* ----- Side Headers ----- */
 .orderbook__header {
   font-weight: 700;
   font-size: 14px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   text-align: center;
-  padding: 8px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: var(--pm-radius-md, 12px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .orderbook__side--yes .orderbook__header {
-  background-color: rgba(76, 175, 80, 0.1);
-  color: #4caf50;
+  background: var(--pm-yes-light, rgba(16, 185, 129, 0.15));
+  color: var(--pm-yes-color, #10B981);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .orderbook__side--no .orderbook__header {
-  background-color: rgba(244, 67, 54, 0.1);
-  color: #f44336;
+  background: var(--pm-no-light, rgba(239, 68, 68, 0.15));
+  color: var(--pm-no-color, #EF4444);
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
+/* ----- Order List ----- */
 .orderbook__list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
+/* ----- Order Rows ----- */
 .orderbook__row {
   display: flex;
   justify-content: space-between;
-  padding: 6px 8px;
-  border-radius: 6px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--pm-radius-sm, 8px);
   font-size: 13px;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.orderbook__row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
 }
 
 .orderbook__row:hover {
-  background-color: var(--tg-theme-secondary-bg-color);
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.orderbook__row--yes {
-  border-left: 2px solid #4caf50;
+.orderbook__row--yes::before {
+  background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
 }
 
-.orderbook__row--no {
-  border-left: 2px solid #f44336;
+.orderbook__row--no::before {
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
 }
 
+.orderbook__row--yes:hover {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.orderbook__row--no:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ----- Price & Amount ----- */
 .orderbook__price {
-  font-weight: 600;
-  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
+  font-size: 14px;
+}
+
+.orderbook__row--yes .orderbook__price {
+  color: var(--pm-yes-color, #10B981);
+}
+
+.orderbook__row--no .orderbook__price {
+  color: var(--pm-no-color, #EF4444);
 }
 
 .orderbook__amount {
   color: var(--tg-theme-hint-color);
   font-size: 12px;
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
 }
 
+/* ----- Empty State ----- */
 .orderbook__empty {
   text-align: center;
-  padding: 20px;
+  padding: 24px 16px;
   color: var(--tg-theme-hint-color);
-  font-size: 13px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--pm-radius-md, 12px);
 }

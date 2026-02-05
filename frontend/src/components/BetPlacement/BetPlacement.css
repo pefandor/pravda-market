@@ -1,71 +1,203 @@
+/* ========================================
+   BET PLACEMENT - Premium Betting UI
+   ======================================== */
+
 .bet-placement {
-  margin: 16px 0;
+  margin: 20px 0;
+  padding: 0 16px;
 }
 
 .bet-placement__form {
-  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--pm-radius-xl, 20px);
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .bet-placement__field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .bet-placement__label {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 14px;
   color: var(--tg-theme-text-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
+/* ----- Side Selection Buttons ----- */
 .bet-placement__side-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 12px;
 }
 
 .bet-placement__side-button {
-  padding: 12px;
-  font-weight: 600;
+  padding: 18px 16px !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
+  border-radius: var(--pm-radius-lg, 16px) !important;
+  border: 2px solid transparent !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  overflow: hidden;
 }
 
-.bet-placement__side-button--active {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+/* YES Button */
+.bet-placement__side-button:first-child {
+  background: rgba(16, 185, 129, 0.1) !important;
+  color: var(--pm-yes-color, #10B981) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
 }
 
+.bet-placement__side-button:first-child:hover,
+.bet-placement__side-button:first-child.bet-placement__side-button--active {
+  background: linear-gradient(135deg, #10B981 0%, #34D399 100%) !important;
+  color: white !important;
+  border-color: transparent !important;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4) !important;
+  transform: translateY(-2px);
+}
+
+/* NO Button */
+.bet-placement__side-button:last-child {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: var(--pm-no-color, #EF4444) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+.bet-placement__side-button:last-child:hover,
+.bet-placement__side-button:last-child.bet-placement__side-button--active {
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%) !important;
+  color: white !important;
+  border-color: transparent !important;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4) !important;
+  transform: translateY(-2px);
+}
+
+.bet-placement__side-button:active {
+  transform: scale(0.98) !important;
+}
+
+/* Active state glow */
+.bet-placement__side-button--active::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  animation: button-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes button-glow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ----- Input Styling ----- */
+.bet-placement__field input {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: var(--pm-radius-md, 12px) !important;
+  padding: 14px 16px !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: var(--tg-theme-text-color) !important;
+  transition: all 0.3s ease !important;
+}
+
+.bet-placement__field input:focus {
+  border-color: var(--pm-accent-primary, #6366F1) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ----- Hints ----- */
 .bet-placement__hint {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--tg-theme-hint-color);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bet-placement__hint--error {
-  color: #f44336;
+  color: var(--pm-no-color, #EF4444);
   font-weight: 600;
 }
 
+.bet-placement__hint--error::before {
+  content: '⚠';
+}
+
+/* ----- Error Message ----- */
 .bet-placement__error {
-  padding: 12px;
-  background-color: rgba(244, 67, 54, 0.1);
-  color: #f44336;
-  border-radius: 8px;
-  font-size: 14px;
-  text-align: center;
-}
-
-.bet-placement__success {
-  padding: 12px;
-  background-color: rgba(76, 175, 80, 0.1);
-  color: #4caf50;
-  border-radius: 8px;
+  padding: 14px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--pm-no-color, #EF4444);
+  border-radius: var(--pm-radius-md, 12px);
   font-size: 14px;
   text-align: center;
   font-weight: 600;
 }
 
+/* ----- Success Message ----- */
+.bet-placement__success {
+  padding: 14px 16px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--pm-yes-color, #10B981);
+  border-radius: var(--pm-radius-md, 12px);
+  font-size: 14px;
+  text-align: center;
+  font-weight: 700;
+  animation: success-pop 0.3s ease;
+}
+
+@keyframes success-pop {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ----- Submit Button ----- */
 .bet-placement__submit {
   margin-top: 8px;
-  font-weight: 700;
+  padding: 16px 24px !important;
+  font-weight: 800 !important;
+  font-size: 16px !important;
+  border-radius: var(--pm-radius-lg, 16px) !important;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%) !important;
+  color: white !important;
+  border: none !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bet-placement__submit:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4) !important;
+}
+
+.bet-placement__submit:active:not(:disabled) {
+  transform: scale(0.98) !important;
+}
+
+.bet-placement__submit:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
 }

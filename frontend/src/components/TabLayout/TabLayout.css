@@ -1,11 +1,135 @@
+/* ========================================
+   TAB LAYOUT - Premium Navigation
+   ======================================== */
+
 .tab-layout {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background: var(--tg-theme-bg-color);
 }
 
 .tab-layout__content {
   flex: 1;
-  padding-bottom: 80px;
+  padding-bottom: 90px;
   overflow-y: auto;
+}
+
+/* ----- Custom Tab Bar ----- */
+.tab-layout__tabbar {
+  position: fixed !important;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--tg-theme-secondary-bg-color) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 16px 24px !important;
+  display: flex;
+  justify-content: space-around;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Override Telegram UI tabbar item styles */
+.tab-layout__tabbar > * {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: var(--pm-radius-lg, 16px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+  border: none;
+  color: var(--tg-theme-hint-color);
+}
+
+/* Tab Item Active States */
+.tab-layout__tabbar > *:active {
+  transform: scale(0.92);
+}
+
+/* Icon Container - make icons bigger */
+.tab-layout__tabbar svg {
+  width: 26px;
+  height: 26px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 4px;
+}
+
+/* Tab Label */
+.tab-layout__tabbar span,
+.tab-layout__tabbar [class*="text"] {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ----- Active Tab Styles ----- */
+.tab-layout__tabbar > *[data-selected="true"],
+.tab-layout__tabbar > *.tgui-tabbar__item--selected {
+  color: var(--pm-accent-primary, #6366F1) !important;
+  background: rgba(99, 102, 241, 0.1);
+}
+
+/* Active Tab Top Indicator */
+.tab-layout__tabbar > *[data-selected="true"]::before,
+.tab-layout__tabbar > *.tgui-tabbar__item--selected::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+/* Active Icon Effects */
+.tab-layout__tabbar > *[data-selected="true"] svg,
+.tab-layout__tabbar > *.tgui-tabbar__item--selected svg {
+  transform: translateY(-2px) scale(1.1);
+  filter: drop-shadow(0 4px 12px rgba(99, 102, 241, 0.5));
+}
+
+/* Active Label Gradient */
+.tab-layout__tabbar > *[data-selected="true"] span,
+.tab-layout__tabbar > *[data-selected="true"] [class*="text"],
+.tab-layout__tabbar > *.tgui-tabbar__item--selected span,
+.tab-layout__tabbar > *.tgui-tabbar__item--selected [class*="text"] {
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+}
+
+/* ----- Ripple Effect on Tap ----- */
+.tab-layout__tabbar > *::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: all 0.5s ease-out;
+  pointer-events: none;
+}
+
+.tab-layout__tabbar > *:active::after {
+  width: 120px;
+  height: 120px;
+  opacity: 0;
 }

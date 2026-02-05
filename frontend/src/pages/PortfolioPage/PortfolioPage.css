@@ -1,5 +1,10 @@
+/* ========================================
+   PORTFOLIO PAGE - Premium Design
+   ======================================== */
+
 .portfolio-page {
   padding: 16px;
+  animation: pm-fade-in 0.3s ease;
 }
 
 .portfolio-page__loading {
@@ -7,78 +12,168 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  gap: 16px;
+  padding: 80px 20px;
+  gap: 20px;
   color: var(--tg-theme-hint-color);
 }
 
+.portfolio-page__loading p {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* ----- Retry Button ----- */
 .portfolio-page__retry {
-  background-color: var(--tg-theme-button-color);
-  color: var(--tg-theme-button-text-color);
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  color: white;
   border: none;
-  border-radius: 12px;
-  padding: 12px 24px;
+  border-radius: var(--pm-radius-lg, 16px);
+  padding: 14px 28px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+.portfolio-page__retry:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.4);
 }
 
 .portfolio-page__retry:active {
-  opacity: 0.6;
+  transform: scale(0.98);
 }
 
-/* Balance card */
+/* ----- Balance Card ----- */
 .portfolio-page__balance-card {
-  background: linear-gradient(135deg, var(--tg-theme-button-color), var(--tg-theme-link-color));
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 20px;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #A855F7 100%);
+  border-radius: var(--pm-radius-xl, 20px);
+  padding: 28px 24px;
+  margin-bottom: 24px;
   color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+}
+
+/* Decorative circles */
+.portfolio-page__balance-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.portfolio-page__balance-card::after {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: -10%;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  border-radius: 50%;
 }
 
 .portfolio-page__balance-total {
-  font-size: 36px;
-  font-weight: 700;
-  font-family: 'Courier New', monospace;
-  margin-bottom: 12px;
+  font-size: 40px;
+  font-weight: 800;
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.2);
 }
 
 .portfolio-page__balance-row {
   display: flex;
   justify-content: space-between;
   font-size: 14px;
-  opacity: 0.85;
+  position: relative;
+  z-index: 1;
+}
+
+.portfolio-page__balance-row > div {
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 10px 16px;
+  border-radius: var(--pm-radius-md, 12px);
+  flex: 1;
+  margin: 0 4px;
+}
+
+.portfolio-page__balance-row > div:first-child {
+  margin-left: 0;
+}
+
+.portfolio-page__balance-row > div:last-child {
+  margin-right: 0;
 }
 
 .portfolio-page__balance-label {
   font-weight: 500;
+  font-size: 12px;
+  opacity: 0.85;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-/* Orders */
+.portfolio-page__balance-value {
+  font-weight: 700;
+  font-size: 16px;
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
+}
+
+/* ----- Section Header ----- */
 .portfolio-page__section-header {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--tg-theme-text-color);
-  margin: 20px 0 12px;
+  margin: 24px 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.portfolio-page__section-header::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  background: var(--pm-accent-gradient, linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%));
+  border-radius: 2px;
+}
+
+/* ----- Order Cards ----- */
 .portfolio-page__order {
-  background-color: var(--tg-theme-secondary-bg-color);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--pm-radius-lg, 16px);
+  padding: 16px 18px;
+  margin-bottom: 12px;
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .portfolio-page__order:active {
-  opacity: 0.7;
+  transform: scale(0.98);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
 }
 
 .portfolio-page__order-title {
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--tg-theme-text-color);
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+  line-height: 1.4;
 }
 
 .portfolio-page__order-details {
@@ -90,48 +185,71 @@
 }
 
 .portfolio-page__order-side {
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 8px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: var(--pm-radius-full, 9999px);
   font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .portfolio-page__order-side--yes {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #3B82F6;
+  background: var(--pm-yes-light, rgba(16, 185, 129, 0.15));
+  color: var(--pm-yes-color, #10B981);
 }
 
 .portfolio-page__order-side--no {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #EF4444;
+  background: var(--pm-no-light, rgba(239, 68, 68, 0.15));
+  color: var(--pm-no-color, #EF4444);
 }
 
+/* ----- Cancel Button ----- */
 .portfolio-page__order-cancel {
-  background: none;
-  border: 1px solid var(--tg-theme-hint-color);
-  border-radius: 8px;
-  padding: 4px 12px;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--pm-radius-sm, 8px);
+  padding: 6px 14px;
   font-size: 12px;
-  color: var(--tg-theme-hint-color);
+  font-weight: 600;
+  color: var(--pm-no-color, #EF4444);
   cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.portfolio-page__order-cancel:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--pm-no-color, #EF4444);
 }
 
 .portfolio-page__order-cancel:active {
-  opacity: 0.5;
+  transform: scale(0.95);
 }
 
+/* ----- Empty State ----- */
 .portfolio-page__empty {
   text-align: center;
-  padding: 40px 20px;
+  padding: 60px 24px;
   color: var(--tg-theme-hint-color);
 }
 
 .portfolio-page__empty-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  background: linear-gradient(135deg,
+    rgba(99, 102, 241, 0.1) 0%,
+    rgba(139, 92, 246, 0.1) 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  animation: pm-pulse 2s ease-in-out infinite;
 }
 
 .portfolio-page__empty-text {
-  font-size: 15px;
-  line-height: 1.4;
+  font-size: 16px;
+  line-height: 1.5;
+  max-width: 260px;
+  margin: 0 auto;
 }
