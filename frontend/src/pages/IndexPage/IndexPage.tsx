@@ -11,6 +11,21 @@ export const IndexPage: FC = () => {
     <Page back={false}>
       <List>
         <Section
+          header="Pravda Market"
+          footer="Prediction markets platform for Russian market"
+        >
+          <Link to="/markets">
+            <Cell subtitle="Browse active prediction markets">
+              Markets
+            </Cell>
+          </Link>
+          <Link to="/profile">
+            <Cell subtitle="View your balance and portfolio">
+              Profile
+            </Cell>
+          </Link>
+        </Section>
+        <Section
           header="Features"
           footer="You can use these pages to learn more about features, provided by Telegram Mini Apps and other useful projects"
         >

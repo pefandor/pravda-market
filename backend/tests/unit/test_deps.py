@@ -55,7 +55,7 @@ def test_get_current_user_invalid_format(test_db_session):
         get_current_user(authorization=authorization, db=test_db_session)
 
     assert exc_info.value.status_code == 401
-    assert "Invalid authorization header format" in exc_info.value.detail
+    assert "Authentication failed" in exc_info.value.detail
 
 
 @pytest.mark.unit

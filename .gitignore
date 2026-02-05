@@ -1,6 +1,8 @@
 # Environment Variables
 .env
+.env.*
 .env.local
+.env.production
 *.env
 
 # Python
@@ -69,3 +71,7 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+
+# Deprecated/unused directories
+telegram-mini-app/
+nul

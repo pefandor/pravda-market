@@ -118,7 +118,7 @@ def test_resolve_market_yes_wins(test_client, test_db_session):
     # === RESOLUTION: YES WINS ===
     response = test_client.post(
         f"/admin/markets/{market.id}/resolve",
-        headers={"Authorization": "Bearer admin_secret_token"},
+        headers={"Authorization": "Bearer test_admin_token"},
         json={"outcome": "yes"}
     )
     assert response.status_code == 200, f"Resolution failed: {response.json()}"
@@ -255,7 +255,7 @@ def test_resolve_market_no_wins(test_client, test_db_session):
     # Resolve with outcome="no"
     response = test_client.post(
         f"/admin/markets/{market.id}/resolve",
-        headers={"Authorization": "Bearer admin_secret_token"},
+        headers={"Authorization": "Bearer test_admin_token"},
         json={"outcome": "no"}
     )
     assert response.status_code == 200
@@ -325,7 +325,7 @@ def test_non_admin_cannot_resolve(test_client, test_db_session):
         json={"outcome": "yes"}
     )
     assert response.status_code == 403, "Should reject non-admin"
-    assert "admin" in response.json()["detail"].lower()
+    assert "denied" in response.json()["detail"].lower()
 
 
 @pytest.mark.integration
@@ -335,7 +335,7 @@ def test_cannot_resolve_nonexistent_market(test_client, test_db_session):
     """
     response = test_client.post(
         "/admin/markets/99999/resolve",
-        headers={"Authorization": "Bearer admin_secret_token"},
+        headers={"Authorization": "Bearer test_admin_token"},
         json={"outcome": "yes"}
     )
     assert response.status_code == 404
@@ -363,7 +363,7 @@ def test_cannot_resolve_already_resolved_market(test_client, test_db_session):
     # Try to resolve again
     response = test_client.post(
         f"/admin/markets/{market.id}/resolve",
-        headers={"Authorization": "Bearer admin_secret_token"},
+        headers={"Authorization": "Bearer test_admin_token"},
         json={"outcome": "no"}
     )
     assert response.status_code == 400

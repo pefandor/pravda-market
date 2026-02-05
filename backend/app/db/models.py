@@ -31,7 +31,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    telegram_id = Column(Integer, unique=True, index=True, nullable=False)
+    telegram_id = Column(BigInteger, unique=True, index=True, nullable=False)
     username = Column(String(255), nullable=True)
     first_name = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=utcnow)
@@ -73,7 +73,7 @@ class Market(Base):
     no_price = Column(Integer, default=5000)   # в basis points
 
     # Volume (для статистики)
-    volume = Column(Integer, default=0)  # в копейках
+    volume = Column(BigInteger, default=0)  # в копейках
 
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)

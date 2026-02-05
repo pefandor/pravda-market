@@ -1,0 +1,51 @@
+name: Deploy to Railway
+
+on:
+  # Deploy only after Tests workflow succeeds
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: [ master, main ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    # Skip deploy if tests failed (workflow_run fires on any completion)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Railway CLI
+      run: npm install -g @railway/cli
+
+    - name: Deploy to Railway
+      working-directory: ./backend
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      run: |
+        railway up --service backend
+      if: ${{ env.RAILWAY_TOKEN != '' }}
+
+    - name: Skip deployment (no Railway token)
+      if: ${{ env.RAILWAY_TOKEN == '' }}
+      run: |
+        echo "⚠️  Railway token not configured. Skipping deployment."
+        echo "To enable deployment, add RAILWAY_TOKEN to GitHub Secrets."
+
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+
+    steps:
+    - name: Deployment status
+      run: |
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "✅ Deployment successful!"
+        else
+          echo "❌ Deployment failed or skipped"
+        fi

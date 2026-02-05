@@ -9,12 +9,13 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, ConfigDict
 from typing import Dict, Any
-import os
+import hmac
 
 from app.db.session import get_db
 from app.db.models import Market
 from app.core.rate_limit import limiter
 from app.core.logging_config import get_logger
+from app.core.config import settings
 
 router = APIRouter(
     prefix="/admin",
@@ -53,16 +54,14 @@ def get_admin_user(authorization: str = Header(...)) -> bool:
     Raises:
         HTTPException: 403 if not authorized
     """
-    admin_token = os.getenv("ADMIN_TOKEN", "admin_secret_token")
-    expected_header = f"Bearer {admin_token}"
+    expected_header = f"Bearer {settings.ADMIN_TOKEN}"
 
-    if authorization != expected_header:
-        logger.warning("Unauthorized admin access attempt", extra={
-            "provided_auth": authorization[:20] + "..." if len(authorization) > 20 else authorization
-        })
+    # SECURITY: Constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(authorization, expected_header):
+        logger.warning("Unauthorized admin access attempt")
         raise HTTPException(
             status_code=403,
-            detail="Admin access required. Please provide valid admin token."
+            detail="Access denied"
         )
 
     return True
@@ -124,9 +123,13 @@ async def resolve_market(
         "title": market.title
     })
 
-    # Settle market (this updates market.resolved = True)
+    # Settle market (creates ledger entries, does NOT commit)
     try:
         settlement_stats = settle_market(market_id, resolve_request.outcome, db)
+
+        # CRITICAL: Commit in the route handler (not in the service)
+        # This gives the caller control over the transaction boundary
+        db.commit()
 
         logger.info("Market resolved successfully", extra={
             "market_id": market_id,
@@ -150,5 +153,5 @@ async def resolve_market(
         })
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to resolve market: {str(e)}"
+            detail="Failed to resolve market. Please check server logs."
         )

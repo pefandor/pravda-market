@@ -66,7 +66,7 @@ def calculate_settlement(amount_kopecks: int, price_bp: int) -> tuple[int, int]:
         (33, 67)  # Handles rounding: 33 + 67 = 100 ✓
 
     Raises:
-        AssertionError: If settlement doesn't sum to amount (CRITICAL BUG!)
+        ValueError: If settlement doesn't sum to amount (CRITICAL BUG!)
     """
     # Calculate YES cost (floor division for rounding)
     yes_cost = (amount_kopecks * price_bp) // 10000
@@ -74,10 +74,11 @@ def calculate_settlement(amount_kopecks: int, price_bp: int) -> tuple[int, int]:
     # Calculate NO cost (ensures invariant: yes + no = amount)
     no_cost = amount_kopecks - yes_cost
 
-    # CRITICAL: Runtime invariant check
-    # If this fails, there's a bug in the calculation logic
-    assert yes_cost + no_cost == amount_kopecks, \
-        f"Settlement invariant violated! {yes_cost} + {no_cost} != {amount_kopecks}"
+    # CRITICAL: Runtime invariant check (works even with python -O)
+    if yes_cost + no_cost != amount_kopecks:
+        raise ValueError(
+            f"Settlement invariant violated! {yes_cost} + {no_cost} != {amount_kopecks}"
+        )
 
     return yes_cost, no_cost
 

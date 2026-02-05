@@ -75,9 +75,16 @@ def place_bet(
     if market.resolved:
         raise HTTPException(400, "Market already resolved")
 
-    # 2. Convert to kopecks and basis points
-    amount_kopecks = int(bet.amount * 100)
-    price_bp = int(bet.price * 10000)
+    # 1b. Check deadline (prevent betting after event outcome is known)
+    if market.deadline:
+        # Handle both naive (SQLite) and aware (PostgreSQL) datetimes
+        deadline_utc = market.deadline.replace(tzinfo=timezone.utc) if market.deadline.tzinfo is None else market.deadline
+        if deadline_utc < datetime.now(timezone.utc):
+            raise HTTPException(400, "Market deadline has passed, betting is closed")
+
+    # 2. Convert to kopecks and basis points (round to avoid float truncation)
+    amount_kopecks = round(bet.amount * 100)
+    price_bp = round(bet.price * 10000)
 
     # 3. SECURITY: Validate order size (DOS protection)
     try:
@@ -90,8 +97,8 @@ def place_bet(
         })
         raise HTTPException(400, str(e))
 
-    # 4. Check balance
-    if not has_sufficient_balance(user.id, amount_kopecks, db):
+    # 4. Check balance (FOR UPDATE: lock ledger rows to prevent double-spend)
+    if not has_sufficient_balance(user.id, amount_kopecks, db, for_update=True):
         available = get_available_balance(user.id, db)
         logger.warning("Insufficient balance", extra={
             "user_id": user.id,
@@ -292,31 +299,40 @@ def cancel_order(
     # Store user for rate limiter
     request.state.user = user
 
-    # 1. Get order
+    # 1. Get order (FOR UPDATE: lock row to prevent double-refund race condition)
     order = db.query(Order).filter(
         Order.id == order_id,
         Order.user_id == user.id  # Security: только свои ордера
-    ).first()
+    ).with_for_update().first()
 
     if not order:
         raise HTTPException(404, "Order not found")
 
-    if order.status != 'open':
+    if order.status not in ('open', 'partial'):
         raise HTTPException(400, f"Cannot cancel order with status '{order.status}'")
 
-    # 2. Update order status
+    # 2. Check market is not resolved (can't cancel on resolved market)
+    market = db.query(Market).filter(Market.id == order.market_id).first()
+    if market and market.resolved:
+        raise HTTPException(400, "Cannot cancel order on a resolved market")
+
+    # 3. Calculate refund: for partial orders, only unlock unfilled portion
+    refund_kopecks = order.amount_kopecks - order.filled_kopecks
+
+    # 4. Update order status
     try:
         order.status = 'cancelled'
         order.updated_at = datetime.now(timezone.utc)
 
-        # 3. Unlock funds (positive ledger entry)
-        unlock_entry = LedgerEntry(
-            user_id=user.id,
-            amount_kopecks=order.amount_kopecks,  # Positive = unlock
-            type='order_unlock',
-            reference_id=order.id
-        )
-        db.add(unlock_entry)
+        # 5. Unlock unfilled funds (positive ledger entry)
+        if refund_kopecks > 0:
+            unlock_entry = LedgerEntry(
+                user_id=user.id,
+                amount_kopecks=refund_kopecks,  # Positive = unlock
+                type='order_unlock',
+                reference_id=order.id
+            )
+            db.add(unlock_entry)
 
         db.commit()
         db.refresh(order)
@@ -324,13 +340,14 @@ def cancel_order(
         logger.info("Order cancelled", extra={
             "order_id": order.id,
             "user_id": user.id,
-            "unlocked_amount": order.amount_rubles
+            "unlocked_amount": refund_kopecks / 100,
+            "filled_amount": order.filled_kopecks / 100
         })
 
         return {
             "success": True,
             "order_id": order.id,
-            "unlocked_amount": order.amount_rubles,
+            "unlocked_amount": refund_kopecks / 100,
             "status": order.status
         }
 

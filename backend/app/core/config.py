@@ -27,15 +27,18 @@ class Settings(BaseSettings):
     # Application Settings
     ENVIRONMENT: str = "development"
     
-    # Telegram Bot Settings
-    TELEGRAM_BOT_TOKEN: str = "test_token_for_development"
+    # Telegram Bot Settings (REQUIRED — no default, must be set in .env or environment)
+    TELEGRAM_BOT_TOKEN: str
+
+    # Admin Authentication (REQUIRED — no default)
+    ADMIN_TOKEN: str
     
     # Database Settings
     DATABASE_URL: str = "sqlite:///./pravda_market.db"
     TEST_DATABASE_URL: str = "sqlite:///./test_pravda_market.db"
     
-    # CORS Settings
-    ALLOWED_ORIGINS: str = "*"
+    # CORS Settings (default: localhost dev server; set explicit domains in production)
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     
     # Logging Settings
     LOG_LEVEL: str = "INFO"
@@ -88,13 +91,10 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-# Validation: Print warning if using default values in production
+# Validation: Print warning if using unsafe values in production
 if settings.is_production:
-    if settings.TELEGRAM_BOT_TOKEN == "test_token_for_development":
-        print("⚠️  WARNING: Using default TELEGRAM_BOT_TOKEN in production!")
-    
     if settings.DATABASE_URL.startswith("sqlite"):
-        print("⚠️  WARNING: Using SQLite in production! Use PostgreSQL instead.")
-    
+        print("WARNING: Using SQLite in production! Use PostgreSQL instead.")
+
     if settings.ALLOWED_ORIGINS == "*":
-        print("⚠️  WARNING: CORS allows all origins (*) in production! Security risk!")
+        print("WARNING: CORS allows all origins (*) in production! Security risk!")

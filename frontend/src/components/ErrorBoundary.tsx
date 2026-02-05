@@ -7,38 +7,64 @@ import {
 } from 'react';
 
 export interface ErrorBoundaryProps extends PropsWithChildren {
-  fallback?: ReactNode | ComponentType<{ error: unknown }>;
+  fallback?: ReactNode | ComponentType<{ error: unknown; reset: () => void }>;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+  resetKeys?: Array<string | number>;
 }
 
 interface ErrorBoundaryState {
   error?: unknown;
+  hasError: boolean;
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = {};
+  state: ErrorBoundaryState = {
+    hasError: false,
+  };
 
   // eslint-disable-next-line max-len
-  static getDerivedStateFromError: GetDerivedStateFromError<ErrorBoundaryProps, ErrorBoundaryState> = (error) => ({ error });
+  static getDerivedStateFromError: GetDerivedStateFromError<ErrorBoundaryProps, ErrorBoundaryState> = (error) => ({
+    error,
+    hasError: true,
+  });
 
-  componentDidCatch(error: Error) {
-    this.setState({ error });
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log error to console
+    console.error('ErrorBoundary caught error:', error, errorInfo);
+
+    // Call optional error handler
+    this.props.onError?.(error, errorInfo);
   }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    // Reset error state when resetKeys change
+    if (
+      this.state.hasError &&
+      this.props.resetKeys &&
+      prevProps.resetKeys &&
+      this.props.resetKeys.some((key, index) => key !== prevProps.resetKeys?.[index])
+    ) {
+      this.reset();
+    }
+  }
+
+  reset = () => {
+    this.setState({ error: undefined, hasError: false });
+  };
 
   render() {
     const {
-      state: {
-        error,
-      },
-      props: {
-        fallback: Fallback,
-        children,
-      },
+      state: { error, hasError },
+      props: { fallback: Fallback, children },
     } = this;
 
-    return 'error' in this.state
-      ? typeof Fallback === 'function'
-        ? <Fallback error={error} />
-        : Fallback
-      : children;
+    if (hasError) {
+      if (typeof Fallback === 'function') {
+        return <Fallback error={error} reset={this.reset} />;
+      }
+      return Fallback;
+    }
+
+    return children;
   }
 }

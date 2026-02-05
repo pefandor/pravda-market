@@ -5,7 +5,7 @@ Tests for Telegram WebApp authentication validation
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from urllib.parse import urlencode
 import json
@@ -28,7 +28,7 @@ def test_validate_telegram_init_data_success(mock_init_data):
     assert result["username"] == "test"
     assert result["first_name"] == "Test User"
     assert isinstance(result["auth_date"], datetime)
-    assert datetime.now() - result["auth_date"] < timedelta(minutes=1)
+    assert datetime.now(timezone.utc) - result["auth_date"] < timedelta(minutes=1)
 
 
 @pytest.mark.unit
@@ -49,7 +49,7 @@ def test_validate_telegram_init_data_invalid_hash():
         validate_telegram_init_data(init_data)
 
     assert exc_info.value.status_code == 401
-    assert "Invalid hash" in exc_info.value.detail
+    assert "Authentication failed" in exc_info.value.detail
 
 
 @pytest.mark.unit
@@ -70,7 +70,7 @@ def test_validate_telegram_init_data_missing_hash():
         validate_telegram_init_data(init_data)
 
     assert exc_info.value.status_code == 401
-    assert "Missing hash" in exc_info.value.detail
+    assert "Authentication failed" in exc_info.value.detail
 
 
 @pytest.mark.unit
@@ -91,7 +91,7 @@ def test_validate_telegram_init_data_missing_auth_date():
         validate_telegram_init_data(init_data)
 
     assert exc_info.value.status_code == 401
-    assert "Missing auth_date" in exc_info.value.detail
+    assert "Authentication failed" in exc_info.value.detail
 
 
 @pytest.mark.unit
@@ -141,7 +141,7 @@ def test_validate_telegram_init_data_expired():
         validate_telegram_init_data(init_data)
 
     assert exc_info.value.status_code == 401
-    assert "expired" in exc_info.value.detail.lower()
+    assert "Authentication failed" in exc_info.value.detail
 
 
 @pytest.mark.unit

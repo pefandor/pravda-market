@@ -32,7 +32,9 @@ htmlcov/
 
 # Environment files (секреты не должны попасть в Docker image)
 .env
+.env.*
 .env.local
+.env.production
 
 # Git
 .git/

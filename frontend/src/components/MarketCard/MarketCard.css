@@ -1,0 +1,52 @@
+.market-card {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.market-card:hover {
+  background-color: var(--tg-theme-secondary-bg-color);
+}
+
+.market-card__title {
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.market-card__info {
+  display: flex;
+  gap: 12px;
+  color: var(--tg-theme-hint-color);
+  font-size: 13px;
+}
+
+.market-card__deadline,
+.market-card__volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.market-card__prices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.market-card__price {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.market-card__price--yes {
+  background-color: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+}
+
+.market-card__price--no {
+  background-color: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+}

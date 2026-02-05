@@ -8,7 +8,7 @@ import hmac
 import hashlib
 import json
 from urllib.parse import parse_qsl
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from app.core.config import settings
 
@@ -58,10 +58,10 @@ def validate_telegram_init_data(init_data: str) -> dict:
             raise ValueError("Missing auth_date in initData")
 
         auth_date = int(auth_date_str)
-        auth_datetime = datetime.fromtimestamp(auth_date)
+        auth_datetime = datetime.fromtimestamp(auth_date, tz=timezone.utc)
 
         # Check if expired (older than 24 hours)
-        if datetime.now() - auth_datetime > INIT_DATA_MAX_AGE:
+        if datetime.now(timezone.utc) - auth_datetime > INIT_DATA_MAX_AGE:
             raise ValueError(f"Init data expired (older than {INIT_DATA_MAX_AGE})")
 
         # Create data-check-string
@@ -103,20 +103,20 @@ def validate_telegram_init_data(init_data: str) -> dict:
             'auth_date': auth_datetime
         }
 
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         raise HTTPException(
             status_code=401,
-            detail=f"Invalid user data format: {str(e)}"
+            detail="Invalid user data format"
         )
     except ValueError as e:
         raise HTTPException(
             status_code=401,
-            detail=f"Invalid Telegram authentication: {str(e)}"
+            detail="Authentication failed"
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=401,
-            detail=f"Authentication error: {str(e)}"
+            detail="Authentication error"
         )
 
 

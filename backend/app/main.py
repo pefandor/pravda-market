@@ -4,11 +4,12 @@ Pravda Market API - FastAPI Application
 Простое prediction market приложение для Telegram Mini App
 """
 
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any
 from contextlib import asynccontextmanager
 import os
@@ -29,6 +30,21 @@ from app.core.rate_limit import limiter
 from fastapi import HTTPException
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to all responses"""
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if settings.is_production:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Content-Security-Policy"] = "default-src 'self'"
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -46,8 +62,13 @@ async def lifespan(app: FastAPI):
     })
 
     # Initialize database
-    init_db()
-    logger.info("Database initialized successfully")
+    # Production: Alembic migrations run before app start (see Dockerfile CMD)
+    # Development (SQLite): Use create_all as fallback for convenience
+    if settings.is_development and settings.DATABASE_URL.startswith("sqlite"):
+        init_db()
+        logger.info("Database initialized via create_all (dev mode)")
+    else:
+        logger.info("Skipping create_all — using Alembic migrations")
 
     yield
 
@@ -56,11 +77,15 @@ async def lifespan(app: FastAPI):
 
 
 # Создаем FastAPI приложение с lifespan
+# SECURITY: Hide Swagger/ReDoc in production (prevent API exploration by attackers)
 app = FastAPI(
     title="Pravda Market API",
     description="Платформа коллективных прогнозов для российского рынка",
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
 )
 
 # Add rate limiter
@@ -71,14 +96,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_exception_handler(APIException, api_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 
+# Security headers middleware (runs AFTER CORS middleware in the stack)
+app.add_middleware(SecurityHeadersMiddleware)
+
 # CORS для frontend (Telegram Mini App)
-# SECURITY: Restrict origins in production (configured via ALLOWED_ORIGINS env var)
+# SECURITY: Restrict origins, methods, and headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 
 # Подключение роутеров
@@ -113,7 +141,7 @@ def health(request: Request) -> Dict[str, str]:
     """
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -138,7 +166,7 @@ async def health_ready(request: Request, db: Session = Depends(get_db)) -> Dict[
 
     checks = {
         "status": "ready",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "checks": {}
     }
 
@@ -147,8 +175,10 @@ async def health_ready(request: Request, db: Session = Depends(get_db)) -> Dict[
         db.execute(text("SELECT 1"))
         checks["checks"]["database"] = "ok"
     except Exception as e:
+        logger = get_logger()
+        logger.error("Database health check failed", extra={"error": str(e)})
         checks["status"] = "not_ready"
-        checks["checks"]["database"] = f"error: {str(e)}"
+        checks["checks"]["database"] = "unavailable"
         raise HTTPException(503, detail=checks)
 
     # Add more checks here as needed

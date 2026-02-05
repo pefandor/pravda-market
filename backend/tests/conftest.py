@@ -6,6 +6,13 @@ Shared test fixtures for backend testing
 
 import pytest
 import os
+
+# Set test environment variables BEFORE importing app modules.
+# Settings() is instantiated at import time in config.py,
+# so these must be set before any app.* import.
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test_bot_token")
+os.environ.setdefault("ADMIN_TOKEN", "test_admin_token")
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient

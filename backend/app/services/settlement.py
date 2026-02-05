@@ -62,6 +62,21 @@ def settle_market(market_id: int, outcome: str, db: Session) -> Dict[str, Any]:
         "outcome": outcome
     })
 
+    # CRITICAL: Lock market row to prevent concurrent resolution (race condition)
+    # SELECT ... FOR UPDATE — blocks other transactions from resolving same market
+    # On SQLite (dev): with_for_update() is silently ignored (safe)
+    # On PostgreSQL (prod): provides row-level locking
+    market = db.query(Market).filter(
+        Market.id == market_id
+    ).with_for_update().first()
+
+    if not market:
+        raise ValueError(f"Market {market_id} not found")
+
+    # Re-check resolved status AFTER acquiring lock (prevents TOCTOU race)
+    if market.resolved:
+        raise ValueError(f"Market {market_id} is already resolved (race condition prevented)")
+
     # Get all trades for this market
     trades = db.query(Trade).filter(Trade.market_id == market_id).all()
 
@@ -92,13 +107,39 @@ def settle_market(market_id: int, outcome: str, db: Session) -> Dict[str, Any]:
             losers_count += 1
             total_payout_kopecks += trade.amount_kopecks
 
-    # Update market status
-    market = db.query(Market).filter(Market.id == market_id).first()
+    # Update market status (row already locked)
     market.resolved = True
     market.outcome = outcome
     market.resolved_at = datetime.now(timezone.utc)
 
-    db.commit()
+    # CRITICAL: Runtime ledger invariant check before commit
+    # Flush pending changes to DB so we can query them
+    db.flush()
+
+    # Verify: total payouts created == total trade amounts for this market
+    trade_ids = [t.id for t in trades]
+    if trade_ids:
+        actual_payout_sum = db.query(
+            func.sum(LedgerEntry.amount_kopecks)
+        ).filter(
+            LedgerEntry.type == 'payout',
+            LedgerEntry.reference_id.in_(trade_ids)
+        ).scalar() or 0
+
+        if actual_payout_sum != total_payout_kopecks:
+            db.rollback()
+            logger.critical("LEDGER INVARIANT VIOLATED in settlement!", extra={
+                "market_id": market_id,
+                "expected_payout": total_payout_kopecks,
+                "actual_payout": actual_payout_sum,
+            })
+            raise ValueError(
+                f"Ledger invariant violated! Expected payout {total_payout_kopecks}, "
+                f"got {actual_payout_sum}"
+            )
+
+    # NOTE: Caller is responsible for db.commit() — gives route handler control
+    # over the transaction boundary
 
     logger.info("Market settlement completed", extra={
         "market_id": market_id,

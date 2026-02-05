@@ -134,7 +134,8 @@ def find_best_match(order: Order, db: Session) -> Optional[Order]:
         Order.market_id == order.market_id,
         Order.side == opposite_side,
         Order.status.in_(['open', 'partial']),
-        Order.id != order.id  # Don't match with self
+        Order.id != order.id,  # Don't match with self (same order)
+        Order.user_id != order.user_id  # SECURITY: Prevent self-trading (wash trading)
     )
 
     if order.side == 'yes':

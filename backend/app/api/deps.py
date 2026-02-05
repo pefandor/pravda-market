@@ -47,12 +47,10 @@ def get_current_user(
 
     # Check Authorization header format
     if not authorization.startswith("twa "):
-        logger.warning("Invalid authorization header format", extra={
-            "header_prefix": authorization[:10] if len(authorization) > 10 else authorization
-        })
+        logger.warning("Invalid authorization header format")
         raise HTTPException(
             status_code=401,
-            detail="Invalid authorization header format. Expected: 'Authorization: twa <initData>'"
+            detail="Authentication failed"
         )
 
     # Extract initData (remove "twa " prefix)
