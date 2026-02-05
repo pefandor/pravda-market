@@ -9,6 +9,7 @@ import { PortfolioPage } from '@/pages/PortfolioPage';
 import { UserProfilePage } from '@/pages/UserProfilePage';
 import { MarketDetailsPage } from '@/pages/MarketDetailsPage';
 import { TONConnectPage } from '@/pages/TONConnectPage/TONConnectPage';
+import { AdminPage } from '@/pages/AdminPage/AdminPage';
 
 export function App() {
   const lp = useLaunchParams();
@@ -31,6 +32,7 @@ export function App() {
           {/* Standalone pages (no tab bar) */}
           <Route path={ROUTES.MARKET_DETAILS} element={<MarketDetailsPage />} />
           <Route path={ROUTES.TON_CONNECT} element={<TONConnectPage />} />
+          <Route path={ROUTES.ADMIN} element={<AdminPage />} />
 
           {/* Redirects */}
           <Route path="/" element={<Navigate to={ROUTES.MARKETS} replace />} />

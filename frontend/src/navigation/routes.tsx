@@ -4,4 +4,5 @@ export const ROUTES = {
   PROFILE: '/profile',
   MARKET_DETAILS: '/market/:marketId',
   TON_CONNECT: '/ton-connect',
+  ADMIN: '/admin',
 } as const;
