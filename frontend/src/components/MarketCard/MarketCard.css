@@ -1,52 +1,70 @@
 .market-card {
+  background-color: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+  padding: 14px 16px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: opacity 0.15s;
 }
 
-.market-card:hover {
-  background-color: var(--tg-theme-secondary-bg-color);
+.market-card:active {
+  opacity: 0.7;
 }
 
 .market-card__title {
-  font-weight: 500;
-  line-height: 1.4;
-  margin-bottom: 4px;
-}
-
-.market-card__info {
-  display: flex;
-  gap: 12px;
-  color: var(--tg-theme-hint-color);
-  font-size: 13px;
-}
-
-.market-card__deadline,
-.market-card__volume {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.market-card__prices {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
-}
-
-.market-card__price {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 12px;
+  line-height: 1.4;
+  color: var(--tg-theme-text-color);
+  margin-bottom: 10px;
 }
 
-.market-card__price--yes {
-  background-color: rgba(76, 175, 80, 0.15);
-  color: #4caf50;
+/* Probability row */
+.market-card__probs {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.market-card__price--no {
-  background-color: rgba(244, 67, 54, 0.15);
-  color: #f44336;
+.market-card__prob-yes {
+  color: #3B82F6;
+}
+
+.market-card__prob-no {
+  color: #EF4444;
+}
+
+/* Progress bar */
+.market-card__bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  margin-bottom: 10px;
+}
+
+.market-card__bar-yes {
+  background-color: #3B82F6;
+  border-radius: 3px 0 0 3px;
+  transition: width 0.3s ease;
+}
+
+.market-card__bar-no {
+  background-color: #EF4444;
+  border-radius: 0 3px 3px 0;
+  flex: 1;
+}
+
+/* Footer meta */
+.market-card__meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+}
+
+.market-card__meta-sep {
+  opacity: 0.4;
 }

@@ -1,0 +1,11 @@
+.tab-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.tab-layout__content {
+  flex: 1;
+  padding-bottom: 80px;
+  overflow-y: auto;
+}

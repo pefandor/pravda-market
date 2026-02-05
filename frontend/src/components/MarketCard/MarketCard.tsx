@@ -1,19 +1,23 @@
-/**
- * MarketCard component
- * Displays a single market with its details
- */
-
 import { memo, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cell, Badge } from '@telegram-apps/telegram-ui';
 import type { Market } from '@/types/api';
-import { bem } from '@/css/bem';
-import { formatPrice, formatDeadline, formatVolume } from '@/utils/formatting';
+import { formatPrice, formatDeadline, formatAmount } from '@/utils/formatting';
 import { sanitizeText } from '@/utils/sanitize';
 
 import './MarketCard.css';
 
-const [b] = bem('market-card');
+const KNOWN_CATEGORIES: Record<string, string> = {
+  sports: 'Спорт',
+  esports: 'Киберспорт',
+  politics: 'Политика',
+  crypto: 'Крипто',
+  weather: 'Погода',
+};
+
+function getCategoryLabel(cat: string | null): string | null {
+  if (!cat) return null;
+  return KNOWN_CATEGORIES[cat] || cat.charAt(0).toUpperCase() + cat.slice(1);
+}
 
 export interface MarketCardProps {
   market: Market;
@@ -21,52 +25,58 @@ export interface MarketCardProps {
 
 const MarketCardComponent: FC<MarketCardProps> = ({ market }) => {
   const navigate = useNavigate();
-
-  const handleClick = () => {
-    navigate(`/market/${market.id}`);
-  };
+  const yesPercent = market.yes_price / 100;
 
   return (
-    <Cell
-      className={b()}
-      onClick={handleClick}
-      subtitle={
-        <div className={b('info')}>
-          <span className={b('deadline')}>🕐 {formatDeadline(market.deadline)}</span>
-          {market.volume > 0 && (
-            <span className={b('volume')}>💰 {formatVolume(market.volume)}</span>
-          )}
-        </div>
-      }
-      after={
-        <div className={b('prices')}>
-          <Badge type="number" className={b('price', 'yes')}>
-            ДА {formatPrice(market.yes_price)}
-          </Badge>
-          <Badge type="number" className={b('price', 'no')}>
-            НЕТ {formatPrice(market.no_price)}
-          </Badge>
-        </div>
-      }
+    <div
+      className="market-card"
+      onClick={() => navigate(`/market/${market.id}`)}
     >
-      <div className={b('title')}>{sanitizeText(market.title)}</div>
-    </Cell>
+      <div className="market-card__title">{sanitizeText(market.title)}</div>
+
+      {/* Probability labels */}
+      <div className="market-card__probs">
+        <span className="market-card__prob-yes">YES {formatPrice(market.yes_price)}</span>
+        <span className="market-card__prob-no">NO {formatPrice(market.no_price)}</span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="market-card__bar">
+        <div
+          className="market-card__bar-yes"
+          style={{ width: `${yesPercent}%` }}
+        />
+        <div className="market-card__bar-no" />
+      </div>
+
+      {/* Meta footer */}
+      <div className="market-card__meta">
+        {market.volume > 0 && (
+          <>
+            <span>{formatAmount(market.volume)}</span>
+            <span className="market-card__meta-sep">·</span>
+          </>
+        )}
+        {market.category && (
+          <>
+            <span>{getCategoryLabel(market.category)}</span>
+            <span className="market-card__meta-sep">·</span>
+          </>
+        )}
+        <span>{formatDeadline(market.deadline)}</span>
+      </div>
+    </div>
   );
 };
 
-/**
- * Memoized version with custom comparison
- * Only re-renders if market properties actually change
- */
 export const MarketCard = memo(MarketCardComponent, (prevProps, nextProps) => {
-  // Return true if props are equal (skip re-render)
-  // Return false if props changed (re-render)
   return (
     prevProps.market.id === nextProps.market.id &&
     prevProps.market.title === nextProps.market.title &&
     prevProps.market.yes_price === nextProps.market.yes_price &&
     prevProps.market.no_price === nextProps.market.no_price &&
     prevProps.market.deadline === nextProps.market.deadline &&
-    prevProps.market.volume === nextProps.market.volume
+    prevProps.market.volume === nextProps.market.volume &&
+    prevProps.market.category === nextProps.market.category
   );
 });

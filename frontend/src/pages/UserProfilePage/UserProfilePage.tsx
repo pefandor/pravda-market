@@ -1,56 +1,32 @@
-/**
- * UserProfilePage - displays user balance, orders, and transaction history
- */
-
 import { FC, useEffect, useState } from 'react';
-import { Section, Cell, List, Spinner, Placeholder, Badge } from '@telegram-apps/telegram-ui';
-import type { UserProfile, Order, LedgerEntry } from '@/types/api';
+import { useNavigate } from 'react-router-dom';
+import { Section, Cell, List, Spinner, Placeholder } from '@telegram-apps/telegram-ui';
+import type { UserProfile, LedgerEntry } from '@/types/api';
 import { getUserProfile, getUserLedger } from '@/services/user';
-import { getUserOrders } from '@/services/bets';
 import { Page } from '@/components/Page';
-import { formatCurrency, formatPrice, formatTimestamp } from '@/utils/formatting';
+import { formatCurrency, formatTimestamp } from '@/utils/formatting';
 import { sanitizeText } from '@/utils/sanitize';
 
 import './UserProfilePage.css';
 
-// Alias for consistency
 const formatAmount = formatCurrency;
 
-/**
- * Format order status
- */
-function getOrderStatusBadge(status: string) {
-  switch (status) {
-    case 'open':
-      return <Badge type="number">Открыт</Badge>;
-    case 'filled':
-      return <Badge type="number">Исполнен</Badge>;
-    case 'cancelled':
-      return <Badge type="number">Отменен</Badge>;
-    default:
-      return <Badge type="number">{status}</Badge>;
-  }
-}
-
-/**
- * Format ledger entry type
- */
 function getLedgerEntryLabel(type: string): string {
   const labels: Record<string, string> = {
-    deposit: '💵 Пополнение',
-    withdraw: '💸 Вывод',
-    order_lock: '🔒 Блокировка (ордер)',
-    order_unlock: '🔓 Разблокировка',
-    trade_lock: '🔒 Блокировка (сделка)',
-    settlement_win: '🎉 Выигрыш',
-    settlement_loss: '😔 Проигрыш',
+    deposit: 'Пополнение',
+    withdraw: 'Вывод',
+    order_lock: 'Блокировка (ордер)',
+    order_unlock: 'Разблокировка',
+    trade_lock: 'Блокировка (сделка)',
+    settlement_win: 'Выигрыш',
+    settlement_loss: 'Проигрыш',
   };
   return labels[type] || type;
 }
 
 export const UserProfilePage: FC = () => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,15 +39,11 @@ export const UserProfilePage: FC = () => {
     try {
       setLoading(true);
       setError(null);
-
-      const [profileData, ordersData, ledgerData] = await Promise.all([
+      const [profileData, ledgerData] = await Promise.all([
         getUserProfile(),
-        getUserOrders(),
         getUserLedger(),
       ]);
-
       setProfile(profileData);
-      setOrders(ordersData);
       setLedger(ledgerData);
     } catch (err) {
       console.error('Failed to load user data:', err);
@@ -131,27 +103,11 @@ export const UserProfilePage: FC = () => {
           </div>
         </Section>
 
-        {/* Active Orders */}
-        <Section header="Активные ордера">
-          {orders.filter(o => o.status === 'open').length === 0 ? (
-            <Placeholder
-              description="У вас нет активных ордеров"
-            />
-          ) : (
-            <List>
-              {orders
-                .filter(o => o.status === 'open')
-                .map(order => (
-                  <Cell
-                    key={order.id}
-                    subtitle={`${order.side === 'yes' ? 'ДА' : 'НЕТ'} @ ${formatPrice(order.price)}`}
-                    after={getOrderStatusBadge(order.status)}
-                  >
-                    {formatAmount(order.amount)}
-                  </Cell>
-                ))}
-            </List>
-          )}
+        {/* TON Connect */}
+        <Section>
+          <Cell onClick={() => navigate('/ton-connect')}>
+            Подключить кошелёк TON
+          </Cell>
         </Section>
 
         {/* Transaction History */}
