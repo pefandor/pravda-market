@@ -112,6 +112,22 @@ export const BetPlacement: FC<BetPlacementProps> = ({ marketId, onSuccess }) => 
     );
   }, [price, amount, priceError, amountError]);
 
+  // Calculate potential profit
+  // Formula: profit = amount * (1 / priceDecimal) - amount
+  // Example: 100₽ @ 65% = 100 * (1/0.65) - 100 = 53.85₽
+  const potentialProfit = useMemo(() => {
+    const priceNum = parseFloat(price);
+    const amountNum = parseFloat(amount);
+
+    if (isNaN(priceNum) || isNaN(amountNum) || priceNum <= 0 || amountNum <= 0) {
+      return null;
+    }
+
+    const priceDecimal = priceNum / 100; // Convert 65 -> 0.65
+    const profit = amountNum * (1 / priceDecimal) - amountNum;
+    return profit;
+  }, [price, amount]);
+
   const handleSubmit = useCallback(async () => {
     try {
       setLoading(true);
@@ -218,6 +234,13 @@ export const BetPlacement: FC<BetPlacementProps> = ({ marketId, onSuccess }) => 
               <span className={b('hint')}>Минимум {MIN_AMOUNT} ₽</span>
             )}
           </div>
+
+          {/* Potential profit display */}
+          {potentialProfit !== null && potentialProfit > 0 && (
+            <div className={b('profit')}>
+              При выигрыше: <span className={b('profit-value')}>+{potentialProfit.toFixed(2)} ₽</span>
+            </div>
+          )}
 
           {/* Error message */}
           {error && <div className={b('error')}>{error}</div>}

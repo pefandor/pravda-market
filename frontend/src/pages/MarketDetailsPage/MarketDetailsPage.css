@@ -27,13 +27,46 @@
   padding: 24px 16px 16px;
 }
 
+.market-details-page__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 .market-details-page__title {
   font-size: 26px;
   font-weight: 800;
-  margin: 0 0 14px 0;
+  margin: 0;
   line-height: 1.25;
   color: var(--tg-theme-text-color);
   letter-spacing: -0.3px;
+  flex: 1;
+}
+
+.market-details-page__share {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: var(--pm-radius-md, 12px);
+  color: var(--pm-accent, #6366f1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.market-details-page__share:hover {
+  background: rgba(99, 102, 241, 0.2);
+  transform: scale(1.05);
+}
+
+.market-details-page__share:active {
+  transform: scale(0.95);
 }
 
 .market-details-page__description {
@@ -92,4 +125,39 @@
   background: linear-gradient(135deg,
     rgba(99, 102, 241, 0.1) 0%,
     rgba(139, 92, 246, 0.1) 100%);
+}
+
+/* ----- Countdown Timer ----- */
+.market-details-page__deadline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.market-details-page__deadline-date {
+  font-size: 15px;
+  color: var(--tg-theme-text-color);
+}
+
+.market-details-page__countdown {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pm-accent, #6366f1);
+  letter-spacing: 0.5px;
+}
+
+.market-details-page__countdown--urgent {
+  color: #ef4444;
+  animation: pm-pulse 1s ease-in-out infinite;
+}
+
+.market-details-page__countdown--expired {
+  color: var(--tg-theme-hint-color);
+  font-weight: 500;
+}
+
+@keyframes pm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }

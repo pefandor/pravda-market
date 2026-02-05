@@ -92,6 +92,7 @@ export const UserProfilePage: FC = () => {
             {profile.user.username && (
               <p className="user-profile-page__username">@{sanitizeText(profile.user.username)}</p>
             )}
+            <p className="user-profile-page__telegram-id">ID: {profile.user.telegram_id}</p>
           </div>
 
           {/* Balance */}
@@ -101,6 +102,14 @@ export const UserProfilePage: FC = () => {
               {formatAmount(profile.balance)}
             </span>
           </div>
+
+          {/* Top Up Button */}
+          <button
+            className="user-profile-page__topup"
+            onClick={() => alert('TON-платежи скоро!')}
+          >
+            Пополнить
+          </button>
         </Section>
 
         {/* TON Connect */}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Spinner, Placeholder } from '@telegram-apps/telegram-ui';
 import type { Order, UserProfile } from '@/types/api';
 import { getUserProfile } from '@/services/user';
-import { getUserOrders } from '@/services/bets';
+import { getUserOrders, cancelOrder } from '@/services/bets';
 import { formatCurrency, formatPrice } from '@/utils/formatting';
 import { Page } from '@/components/Page';
 
@@ -15,6 +15,7 @@ export const PortfolioPage: FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -35,6 +36,26 @@ export const PortfolioPage: FC = () => {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить портфель');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancel = async (orderId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation to market page
+
+    if (!window.confirm('Отменить ордер? Средства будут разблокированы.')) {
+      return;
+    }
+
+    try {
+      setCancellingId(orderId);
+      await cancelOrder(orderId);
+      // Reload data to update balances and orders
+      await loadData();
+    } catch (err) {
+      console.error('Failed to cancel order:', err);
+      alert(err instanceof Error ? err.message : 'Не удалось отменить ордер');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -118,7 +139,17 @@ export const PortfolioPage: FC = () => {
                   {order.side === 'yes' ? 'ДА' : 'НЕТ'} @ {formatPrice(order.price)}
                 </span>
                 <span>{formatCurrency(order.amount)}</span>
-                <span>{order.status === 'open' ? 'Открыт' : 'Исполнен'}</span>
+                {order.status === 'open' ? (
+                  <button
+                    className="portfolio-page__order-cancel"
+                    onClick={(e) => handleCancel(order.id, e)}
+                    disabled={cancellingId === order.id}
+                  >
+                    {cancellingId === order.id ? '...' : 'Отменить'}
+                  </button>
+                ) : (
+                  <span>Исполнен</span>
+                )}
               </div>
             </div>
           ))

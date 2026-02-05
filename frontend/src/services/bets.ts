@@ -42,3 +42,18 @@ export async function getUserOrders(userId?: number): Promise<Order[]> {
   const endpoint = userId ? `/bets/?user_id=${userId}` : '/bets/';
   return api.get<Order[]>(endpoint);
 }
+
+/**
+ * Cancel an open order
+ * Returns unlocked amount
+ */
+export interface CancelOrderResponse {
+  success: boolean;
+  order_id: number;
+  status: string;
+  unlocked_amount: number;
+}
+
+export async function cancelOrder(orderId: number): Promise<CancelOrderResponse> {
+  return api.delete<CancelOrderResponse>(`/bets/${orderId}`);
+}
