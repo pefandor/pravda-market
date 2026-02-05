@@ -29,13 +29,11 @@ jobs:
       working-directory: ./backend
       run: |
         ruff check app tests --output-format=github
-      continue-on-error: true
 
     - name: Run ruff (formatter check)
       working-directory: ./backend
       run: |
         ruff format --check app tests
-      continue-on-error: true
 
   frontend-lint:
     name: Frontend Lint
@@ -61,4 +59,4 @@ jobs:
 
     - name: Run TypeScript check
       working-directory: ./frontend
-      run: npx tsc --noEmit
+      run: npx tsc --noEmit -p tsconfig.build.json
