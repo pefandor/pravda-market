@@ -91,10 +91,10 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-# Validation: Print warning if using unsafe values in production
+# Validation: Fail fast if unsafe values in production
 if settings.is_production:
     if settings.DATABASE_URL.startswith("sqlite"):
-        print("WARNING: Using SQLite in production! Use PostgreSQL instead.")
+        raise ValueError("SQLite is not allowed in production. Set DATABASE_URL to PostgreSQL.")
 
     if settings.ALLOWED_ORIGINS == "*":
-        print("WARNING: CORS allows all origins (*) in production! Security risk!")
+        raise ValueError("CORS wildcard '*' is not allowed in production. Set ALLOWED_ORIGINS to specific domains.")
