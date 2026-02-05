@@ -1,6 +1,8 @@
 # Environment Variables
 .env
 .env.*
+!.env.example
+!.env.production.example
 .env.local
 .env.production
 *.env
