@@ -25,6 +25,7 @@
     "@ton/ton": "^16.1.0",
     "@tonconnect/ui-react": "^2.2.0",
     "@types/dompurify": "^3.0.5",
+    "buffer": "^6.0.3",
     "dompurify": "^3.3.1",
     "eruda": "^3.4.3",
     "react": "^19.2.0",

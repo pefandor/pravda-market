@@ -6,6 +6,15 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
+  // Polyfills for Node.js globals used by @ton/ton
+  define: {
+    global: 'globalThis',
+  },
+  resolve: {
+    alias: {
+      buffer: 'buffer',
+    },
+  },
   css: {
     preprocessorOptions: {
       scss: {
