@@ -1,5 +1,7 @@
 {
-  "url": "https://ton.vote",
-  "name": "TON Vote",
-  "iconUrl": "https://ton.vote/logo.png"
+  "url": "https://adventurous-grace-production-88ef.up.railway.app",
+  "name": "Pravda Market",
+  "iconUrl": "https://adventurous-grace-production-88ef.up.railway.app/logo.svg",
+  "termsOfUseUrl": "https://adventurous-grace-production-88ef.up.railway.app/terms",
+  "privacyPolicyUrl": "https://adventurous-grace-production-88ef.up.railway.app/privacy"
 }
