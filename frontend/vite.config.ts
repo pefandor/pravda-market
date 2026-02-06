@@ -2,19 +2,11 @@ import react from '@vitejs/plugin-react-swc';
 import { defineConfig } from 'vite';
 import mkcert from 'vite-plugin-mkcert';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
-  // Polyfills for Node.js globals used by @ton/ton
-  define: {
-    global: 'globalThis',
-  },
-  resolve: {
-    alias: {
-      buffer: 'buffer',
-    },
-  },
   css: {
     preprocessorOptions: {
       scss: {
@@ -29,6 +21,15 @@ export default defineConfig({
     // Allows using the compilerOptions.paths property in tsconfig.json.
     // https://www.npmjs.com/package/vite-tsconfig-paths
     tsconfigPaths(),
+    // Node.js polyfills for @ton/ton and @ton/core
+    nodePolyfills({
+      include: ['buffer', 'process'],
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+    }),
     // Creates a custom SSL certificate valid for the local machine.
     // Using this plugin requires admin rights on the first dev-mode launch.
     // https://www.npmjs.com/package/vite-plugin-mkcert

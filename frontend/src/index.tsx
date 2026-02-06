@@ -1,7 +1,3 @@
-// Buffer polyfill for @ton/ton and @ton/core (must be first!)
-import { Buffer } from 'buffer';
-(window as any).Buffer = Buffer;
-
 // Include Telegram UI styles first to allow our code override the package CSS.
 import '@telegram-apps/telegram-ui/dist/styles.css';
 
