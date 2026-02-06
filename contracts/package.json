@@ -1,0 +1,28 @@
+{
+  "name": "pravda-escrow",
+  "version": "1.0.0",
+  "description": "TON Escrow Smart Contract for Pravda Market",
+  "scripts": {
+    "build": "blueprint build",
+    "test": "blueprint test",
+    "deploy:testnet": "blueprint run deployEscrow --testnet",
+    "deploy:mainnet": "blueprint run deployEscrow --mainnet",
+    "interact:testnet": "blueprint run interactEscrow --testnet",
+    "interact:mainnet": "blueprint run interactEscrow --mainnet"
+  },
+  "devDependencies": {
+    "@ton/blueprint": "^0.22.0",
+    "@ton/core": "^0.56.0",
+    "@ton/crypto": "^3.2.0",
+    "@ton/sandbox": "^0.20.0",
+    "@ton/test-utils": "^0.4.0",
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@orbs-network/ton-access": "^2.3.3",
+    "@ton/ton": "^14.0.0"
+  }
+}

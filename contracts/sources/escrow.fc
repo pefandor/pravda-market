@@ -1,0 +1,480 @@
+#include "imports/stdlib.fc";
+
+;; ============================================================================
+;; PRAVDA MARKET ESCROW CONTRACT
+;; ============================================================================
+;;
+;; Purpose: Hold user deposits for off-chain prediction market trading
+;;
+;; Features:
+;; - Deposits with telegram_id memo for backend reconciliation
+;; - Operator-initiated batch withdrawals
+;; - Emergency withdrawal after 7-day timelock
+;; - Pause mechanism via multisig
+;;
+;; Storage layout:
+;; - operator_address (MsgAddressInt)
+;; - multisig_address (MsgAddressInt)
+;; - total_deposits (Coins)
+;; - is_paused (1 bit)
+;; - daily_withdrawal_limit (Coins)
+;; - daily_withdrawn (Coins)
+;; - last_withdrawal_day (uint32)
+;; - emergency_delay_seconds (uint32)
+;; - pending_emergencies (Dict)
+;; - user_balances (Dict)
+;; ============================================================================
+
+;; Slice comparison (not in stdlib)
+int equal_slices(slice a, slice b) asm "SDEQ";
+
+;; ============================================================================
+;; CONSTANTS
+;; ============================================================================
+
+;; Op codes (32 bits)
+const int op::deposit = 0x00000001;
+const int op::operator_withdraw = 0x00000002;
+const int op::request_emergency = 0x00000003;
+const int op::execute_emergency = 0x00000004;
+const int op::cancel_emergency = 0x00000005;
+const int op::pause = 0x00000010;
+const int op::unpause = 0x00000011;
+const int op::set_operator = 0x00000012;
+const int op::set_daily_limit = 0x00000013;
+
+;; Error codes
+const int error::insufficient_funds = 101;
+const int error::unauthorized = 102;
+const int error::paused = 103;
+const int error::daily_limit_exceeded = 104;
+const int error::emergency_not_ready = 105;
+const int error::emergency_not_found = 106;
+const int error::invalid_memo = 107;
+const int error::amount_too_small = 108;
+const int error::already_pending = 109;
+
+;; Gas constants (nanoTON)
+const int MIN_DEPOSIT = 100000000;          ;; 0.1 TON minimum deposit
+const int GAS_RESERVE = 50000000;           ;; 0.05 TON for storage fees
+const int FORWARD_GAS = 10000000;           ;; 0.01 TON for forwarding
+
+;; Send modes
+const int SEND_MODE_REGULAR = 0;
+const int SEND_MODE_PAY_FEE_SEPARATELY = 1;
+const int SEND_MODE_IGNORE_ERRORS = 2;
+const int SEND_MODE_DESTROY_ON_ZERO = 32;
+const int SEND_MODE_CARRY_REMAINING = 64;
+const int SEND_MODE_CARRY_ALL = 128;
+
+;; Time constants
+const int SECONDS_PER_DAY = 86400;
+const int DEFAULT_EMERGENCY_DELAY = 604800; ;; 7 days
+
+;; ============================================================================
+;; STORAGE
+;; ============================================================================
+
+;; Global variables (loaded from c4)
+global slice storage::operator;
+global slice storage::multisig;
+global int storage::total_deposits;
+global int storage::is_paused;
+global int storage::daily_limit;
+global int storage::daily_withdrawn;
+global int storage::last_day;
+global int storage::emergency_delay;
+global cell storage::pending_emergencies;
+global cell storage::user_balances;
+
+;; Load all data from persistent storage
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::operator = ds~load_msg_addr();
+    storage::multisig = ds~load_msg_addr();
+    storage::total_deposits = ds~load_coins();
+    storage::is_paused = ds~load_uint(1);
+    storage::daily_limit = ds~load_coins();
+    storage::daily_withdrawn = ds~load_coins();
+    storage::last_day = ds~load_uint(32);
+    storage::emergency_delay = ds~load_uint(32);
+    storage::pending_emergencies = ds~load_dict();
+    storage::user_balances = ds~load_dict();
+}
+
+;; Save all data to persistent storage
+() save_data() impure inline {
+    set_data(begin_cell()
+        .store_slice(storage::operator)
+        .store_slice(storage::multisig)
+        .store_coins(storage::total_deposits)
+        .store_uint(storage::is_paused, 1)
+        .store_coins(storage::daily_limit)
+        .store_coins(storage::daily_withdrawn)
+        .store_uint(storage::last_day, 32)
+        .store_uint(storage::emergency_delay, 32)
+        .store_dict(storage::pending_emergencies)
+        .store_dict(storage::user_balances)
+        .end_cell()
+    );
+}
+
+;; ============================================================================
+;; HELPER FUNCTIONS
+;; ============================================================================
+
+;; Get current day number (for daily limit reset)
+int get_current_day() inline {
+    return now() / SECONDS_PER_DAY;
+}
+
+;; Get user balance from dictionary (returns 0 if not found)
+int get_user_balance(slice user_addr) inline {
+    (slice val, int found) = storage::user_balances.udict_get?(256, slice_hash(user_addr));
+    if (found) {
+        return val~load_coins();
+    }
+    return 0;
+}
+
+;; Set user balance in dictionary (removes entry if zero)
+() set_user_balance(slice user_addr, int amount) impure inline {
+    int key = slice_hash(user_addr);
+    if (amount > 0) {
+        storage::user_balances = storage::user_balances.udict_set_builder(
+            256,
+            key,
+            begin_cell().store_coins(amount)
+        );
+    } else {
+        ;; Remove zero balances to save storage
+        (storage::user_balances, _) = storage::user_balances.udict_delete?(256, key);
+    }
+}
+
+;; Send TON to address
+() send_ton(slice to_addr, int amount, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)                    ;; nobounce
+        .store_slice(to_addr)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+    send_raw_message(msg, mode);
+}
+
+;; Send TON with body
+() send_ton_with_body(slice to_addr, int amount, cell body, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)                    ;; nobounce
+        .store_slice(to_addr)
+        .store_coins(amount)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+        .end_cell();
+    send_raw_message(msg, mode);
+}
+
+;; ============================================================================
+;; MESSAGE HANDLERS
+;; ============================================================================
+
+;; Handle deposit: User sends TON with telegram_id in memo
+() handle_deposit(slice sender_addr, int msg_value, slice body) impure {
+    ;; Parse telegram_id from body
+    int telegram_id = body~load_uint(64);
+
+    ;; Check contract not paused
+    throw_if(error::paused, storage::is_paused);
+
+    ;; Calculate actual deposit (subtract gas reserve)
+    int deposit_amount = msg_value - GAS_RESERVE;
+    throw_if(error::amount_too_small, deposit_amount < MIN_DEPOSIT);
+
+    ;; Update user balance
+    int current_balance = get_user_balance(sender_addr);
+    set_user_balance(sender_addr, current_balance + deposit_amount);
+
+    ;; Update total deposits
+    storage::total_deposits += deposit_amount;
+
+    ;; Save state
+    save_data();
+
+    ;; Note: In production, emit an external message for indexers
+    ;; For now, the transaction itself serves as the event
+}
+
+;; Handle operator withdrawal (batch payouts)
+() handle_operator_withdraw(slice sender_addr, slice body) impure {
+    ;; Verify sender is operator
+    throw_unless(error::unauthorized, equal_slices(sender_addr, storage::operator));
+
+    ;; Check not paused
+    throw_if(error::paused, storage::is_paused);
+
+    ;; Reset daily counter if new day
+    int current_day = get_current_day();
+    if (current_day > storage::last_day) {
+        storage::daily_withdrawn = 0;
+        storage::last_day = current_day;
+    }
+
+    ;; Process batch withdrawals
+    int count = body~load_uint(16);
+
+    repeat (count) {
+        slice recipient = body~load_msg_addr();
+        int amount = body~load_coins();
+        int reference_id = body~load_uint(64);  ;; Backend transaction ID
+
+        ;; Verify user has sufficient balance
+        int user_balance = get_user_balance(recipient);
+        throw_if(error::insufficient_funds, user_balance < amount);
+
+        ;; Check daily limit
+        throw_if(error::daily_limit_exceeded, storage::daily_withdrawn + amount > storage::daily_limit);
+
+        ;; Update user balance
+        set_user_balance(recipient, user_balance - amount);
+
+        ;; Update counters
+        storage::total_deposits -= amount;
+        storage::daily_withdrawn += amount;
+
+        ;; Send TON to recipient
+        cell withdrawal_body = begin_cell()
+            .store_uint(op::operator_withdraw, 32)
+            .store_uint(reference_id, 64)
+            .end_cell();
+        send_ton_with_body(recipient, amount, withdrawal_body, SEND_MODE_PAY_FEE_SEPARATELY);
+    }
+
+    ;; Save state
+    save_data();
+}
+
+;; Request emergency withdrawal (starts 7-day timer)
+() handle_request_emergency(slice sender_addr) impure {
+    ;; Check user has balance
+    int user_balance = get_user_balance(sender_addr);
+    throw_if(error::insufficient_funds, user_balance == 0);
+
+    ;; Check no existing request
+    int key = slice_hash(sender_addr);
+    (_, int exists) = storage::pending_emergencies.udict_get?(256, key);
+    throw_if(error::already_pending, exists);
+
+    ;; Store emergency request with unlock time
+    int unlock_time = now() + storage::emergency_delay;
+    storage::pending_emergencies = storage::pending_emergencies.udict_set_builder(
+        256,
+        key,
+        begin_cell().store_uint(unlock_time, 64)
+    );
+
+    ;; Save state
+    save_data();
+}
+
+;; Execute emergency withdrawal after 7-day delay
+() handle_execute_emergency(slice sender_addr) impure {
+    int key = slice_hash(sender_addr);
+
+    ;; Get emergency request
+    (slice val, int found) = storage::pending_emergencies.udict_get?(256, key);
+    throw_unless(error::emergency_not_found, found);
+
+    ;; Check timelock expired
+    int unlock_time = val~load_uint(64);
+    throw_if(error::emergency_not_ready, now() < unlock_time);
+
+    ;; Get and clear user balance
+    int user_balance = get_user_balance(sender_addr);
+    set_user_balance(sender_addr, 0);
+
+    ;; Remove emergency request
+    (storage::pending_emergencies, _) = storage::pending_emergencies.udict_delete?(256, key);
+
+    ;; Update total
+    storage::total_deposits -= user_balance;
+
+    ;; Save state BEFORE sending (prevent reentrancy)
+    save_data();
+
+    ;; Send funds to user
+    cell body = begin_cell()
+        .store_uint(op::execute_emergency, 32)
+        .end_cell();
+    send_ton_with_body(sender_addr, user_balance, body, SEND_MODE_PAY_FEE_SEPARATELY);
+}
+
+;; Cancel pending emergency withdrawal
+() handle_cancel_emergency(slice sender_addr) impure {
+    int key = slice_hash(sender_addr);
+
+    ;; Check request exists
+    (_, int found) = storage::pending_emergencies.udict_get?(256, key);
+    throw_unless(error::emergency_not_found, found);
+
+    ;; Remove request
+    (storage::pending_emergencies, _) = storage::pending_emergencies.udict_delete?(256, key);
+
+    ;; Save state
+    save_data();
+}
+
+;; Pause contract (multisig only)
+() handle_pause(slice sender_addr) impure {
+    throw_unless(error::unauthorized, equal_slices(sender_addr, storage::multisig));
+    storage::is_paused = 1;
+    save_data();
+}
+
+;; Unpause contract (multisig only)
+() handle_unpause(slice sender_addr) impure {
+    throw_unless(error::unauthorized, equal_slices(sender_addr, storage::multisig));
+    storage::is_paused = 0;
+    save_data();
+}
+
+;; Set new operator (multisig only)
+() handle_set_operator(slice sender_addr, slice body) impure {
+    throw_unless(error::unauthorized, equal_slices(sender_addr, storage::multisig));
+    storage::operator = body~load_msg_addr();
+    save_data();
+}
+
+;; Set daily withdrawal limit (multisig only)
+() handle_set_daily_limit(slice sender_addr, slice body) impure {
+    throw_unless(error::unauthorized, equal_slices(sender_addr, storage::multisig));
+    storage::daily_limit = body~load_coins();
+    save_data();
+}
+
+;; ============================================================================
+;; MAIN ENTRY POINT
+;; ============================================================================
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; Ignore empty messages
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    ;; Parse incoming message
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    ;; Ignore bounced messages
+    if (flags & 1) {
+        return ();
+    }
+
+    ;; Get sender address
+    slice sender_addr = cs~load_msg_addr();
+
+    ;; Load storage
+    load_data();
+
+    ;; Parse op code
+    int op = in_msg_body~load_uint(32);
+
+    ;; Route by op code
+    if (op == op::deposit) {
+        handle_deposit(sender_addr, msg_value, in_msg_body);
+        return ();
+    }
+
+    if (op == op::operator_withdraw) {
+        handle_operator_withdraw(sender_addr, in_msg_body);
+        return ();
+    }
+
+    if (op == op::request_emergency) {
+        handle_request_emergency(sender_addr);
+        return ();
+    }
+
+    if (op == op::execute_emergency) {
+        handle_execute_emergency(sender_addr);
+        return ();
+    }
+
+    if (op == op::cancel_emergency) {
+        handle_cancel_emergency(sender_addr);
+        return ();
+    }
+
+    if (op == op::pause) {
+        handle_pause(sender_addr);
+        return ();
+    }
+
+    if (op == op::unpause) {
+        handle_unpause(sender_addr);
+        return ();
+    }
+
+    if (op == op::set_operator) {
+        handle_set_operator(sender_addr, in_msg_body);
+        return ();
+    }
+
+    if (op == op::set_daily_limit) {
+        handle_set_daily_limit(sender_addr, in_msg_body);
+        return ();
+    }
+
+    ;; Unknown op code - throw error
+    throw(0xffff);
+}
+
+;; ============================================================================
+;; GET METHODS (Read-only queries)
+;; ============================================================================
+
+;; Get contract state
+(int, int, int, int, int) get_contract_state() method_id {
+    load_data();
+    return (
+        storage::total_deposits,
+        storage::is_paused,
+        storage::daily_limit,
+        storage::daily_withdrawn,
+        storage::emergency_delay
+    );
+}
+
+;; Get user balance by address hash
+int get_user_balance_by_hash(int addr_hash) method_id {
+    load_data();
+    (slice val, int found) = storage::user_balances.udict_get?(256, addr_hash);
+    if (found) {
+        return val~load_coins();
+    }
+    return 0;
+}
+
+;; Get emergency withdrawal status
+(int, int) get_emergency_status(int addr_hash) method_id {
+    load_data();
+    (slice val, int found) = storage::pending_emergencies.udict_get?(256, addr_hash);
+    if (found) {
+        int unlock_time = val~load_uint(64);
+        return (1, unlock_time);  ;; (has_pending, unlock_time)
+    }
+    return (0, 0);
+}
+
+;; Get operator address
+slice get_operator() method_id {
+    load_data();
+    return storage::operator;
+}
+
+;; Get multisig address
+slice get_multisig() method_id {
+    load_data();
+    return storage::multisig;
+}
