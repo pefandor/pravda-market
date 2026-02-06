@@ -143,15 +143,15 @@ export const BetPlacement: FC<BetPlacementProps> = ({ marketId, onSuccess }) => 
         return;
       }
 
-      // Convert to API format
-      const priceBasisPoints = Math.round(priceNum * 100);
-      const amountKopecks = Math.round(amountNum * 100);
+      // Send in API format (rubles and decimal price)
+      // Backend expects: price 0.01-0.99, amount in rubles
+      const priceDecimal = priceNum / 100;  // 50% -> 0.50
 
       await placeBet({
         market_id: marketId,
         side,
-        price: priceBasisPoints,
-        amount: amountKopecks,
+        price: priceDecimal,
+        amount: amountNum,  // Already in rubles
       });
 
       setSuccess(true);

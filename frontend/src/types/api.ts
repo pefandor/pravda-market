@@ -90,8 +90,8 @@ export interface Orderbook {
 export interface CreateBetRequest {
   market_id: number;
   side: 'yes' | 'no';
-  price: number;     // in basis points (1-9999)
-  amount: number;    // in kopecks
+  price: number;     // decimal 0.01-0.99 (e.g., 0.50 for 50%)
+  amount: number;    // in rubles (e.g., 100 for 100₽)
 }
 
 export interface CreateBetResponse {
