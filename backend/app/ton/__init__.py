@@ -8,7 +8,10 @@ TON Blockchain Integration
 """
 
 from .config import ton_settings
-from .client import TonCenterClient
-from .indexer import DepositIndexer
 
-__all__ = ["ton_settings", "TonCenterClient", "DepositIndexer"]
+# Lazy imports - TonCenterClient and DepositIndexer require httpx
+# Import them directly when needed:
+#   from app.ton.client import TonCenterClient
+#   from app.ton.indexer import DepositIndexer
+
+__all__ = ["ton_settings"]
