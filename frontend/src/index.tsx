@@ -15,10 +15,22 @@ import './index.css';
 // Mock the environment in case, we are outside Telegram.
 import './mockEnv.ts';
 
+// Global error handler
+window.onerror = (msg, url, line, col, error) => {
+  console.error('[BOOT] Global error:', msg, url, line, col, error);
+  return false;
+};
+window.onunhandledrejection = (event) => {
+  console.error('[BOOT] Unhandled rejection:', event.reason);
+};
+
 const root = ReactDOM.createRoot(document.getElementById('root')!);
+
+console.log('[BOOT] index.tsx loaded, root element:', document.getElementById('root'));
 
 // Simple error display for critical failures
 function showError(message: string) {
+  console.error('[BOOT] showError called:', message);
   root.render(
     <div style={{ padding: 20, color: '#fff', background: '#1a1a2e', minHeight: '100vh' }}>
       <h2>Ошибка загрузки</h2>
@@ -30,6 +42,7 @@ function showError(message: string) {
 
 // Check if we're on admin route - render without Telegram SDK
 const isAdminRoute = window.location.hash.startsWith('#/admin');
+console.log('[BOOT] isAdminRoute:', isAdminRoute, 'hash:', window.location.hash);
 
 if (isAdminRoute) {
   // Admin page works without Telegram SDK
@@ -40,19 +53,24 @@ if (isAdminRoute) {
   );
 } else {
   // Normal Telegram Mini App flow
+  console.log('[BOOT] Starting Telegram Mini App flow');
   try {
+    console.log('[BOOT] Calling retrieveLaunchParams...');
     const launchParams = retrieveLaunchParams();
+    console.log('[BOOT] launchParams:', JSON.stringify(launchParams, null, 2));
     const { tgWebAppPlatform: platform } = launchParams;
     const debug = (launchParams.tgWebAppStartParam || '').includes('debug')
       || import.meta.env.DEV;
 
     // Configure all application dependencies.
+    console.log('[BOOT] Calling init with debug:', debug, 'platform:', platform);
     init({
       debug,
       eruda: debug && ['ios', 'android'].includes(platform),
       mockForMacOS: platform === 'macos',
     })
       .then(() => {
+        console.log('[BOOT] init() resolved, rendering Root');
         root.render(
           <StrictMode>
             <Root/>
@@ -64,10 +82,12 @@ if (isAdminRoute) {
         showError(`Init error: ${e?.message || 'Unknown error'}`);
       });
   } catch (e) {
-    console.error('Launch params error:', e);
+    console.error('[BOOT] Launch params error:', e);
     try {
+      console.log('[BOOT] Rendering EnvUnsupported');
       root.render(<EnvUnsupported/>);
-    } catch {
+    } catch (e2) {
+      console.error('[BOOT] EnvUnsupported render failed:', e2);
       showError('Telegram SDK unavailable');
     }
   }
