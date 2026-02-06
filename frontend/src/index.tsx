@@ -17,6 +17,17 @@ import './mockEnv.ts';
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 
+// Simple error display for critical failures
+function showError(message: string) {
+  root.render(
+    <div style={{ padding: 20, color: '#fff', background: '#1a1a2e', minHeight: '100vh' }}>
+      <h2>Ошибка загрузки</h2>
+      <p>{message}</p>
+      <p style={{ fontSize: 12, opacity: 0.7 }}>Попробуйте перезапустить приложение</p>
+    </div>
+  );
+}
+
 // Check if we're on admin route - render without Telegram SDK
 const isAdminRoute = window.location.hash.startsWith('#/admin');
 
@@ -36,7 +47,7 @@ if (isAdminRoute) {
       || import.meta.env.DEV;
 
     // Configure all application dependencies.
-    await init({
+    init({
       debug,
       eruda: debug && ['ios', 'android'].includes(platform),
       mockForMacOS: platform === 'macos',
@@ -47,8 +58,17 @@ if (isAdminRoute) {
             <Root/>
           </StrictMode>,
         );
+      })
+      .catch((e) => {
+        console.error('Init failed:', e);
+        showError(`Init error: ${e?.message || 'Unknown error'}`);
       });
   } catch (e) {
-    root.render(<EnvUnsupported/>);
+    console.error('Launch params error:', e);
+    try {
+      root.render(<EnvUnsupported/>);
+    } catch {
+      showError('Telegram SDK unavailable');
+    }
   }
 }
