@@ -21,8 +21,8 @@ router = APIRouter(prefix="/ledger", tags=["ledger"])
 class TransactionResponse(BaseModel):
     """Ответ с информацией о транзакции"""
     id: int
-    amount_rubles: float
-    type: str
+    amount: int  # in kopecks (frontend expects kopecks)
+    entry_type: str  # frontend uses entry_type, not type
     reference_id: Optional[int]
     created_at: str
     description: str  # Human-readable description
@@ -81,8 +81,8 @@ def get_transactions(
     return [
         TransactionResponse(
             id=e.id,
-            amount_rubles=e.amount_kopecks / 100,
-            type=e.type,
+            amount=e.amount_kopecks,  # in kopecks, frontend will format
+            entry_type=e.type,  # frontend expects entry_type
             reference_id=e.reference_id,
             created_at=e.created_at.isoformat(),
             description=get_description(e)

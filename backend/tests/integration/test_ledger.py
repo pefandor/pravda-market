@@ -46,8 +46,8 @@ def test_get_transactions_deposit_only(test_client, test_db_session, sample_user
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["type"] == "deposit"
-    assert data[0]["amount_rubles"] == 1000.0
+    assert data[0]["entry_type"] == "deposit"
+    assert data[0]["amount"] == 100000  # in kopecks
     assert data[0]["reference_id"] is None
     assert "Пополнение: +1000.00₽" in data[0]["description"]
 
@@ -116,16 +116,16 @@ def test_get_transactions_full_flow(test_client, test_db_session, sample_user):
     assert len(data) == 3
 
     # Verify order (desc by created_at, so unlock is first)
-    assert data[0]["type"] == "order_unlock"
-    assert data[0]["amount_rubles"] == 100.0
+    assert data[0]["entry_type"] == "order_unlock"
+    assert data[0]["amount"] == 10000  # in kopecks
     assert data[0]["reference_id"] == order.id
 
-    assert data[1]["type"] == "order_lock"
-    assert data[1]["amount_rubles"] == -100.0
+    assert data[1]["entry_type"] == "order_lock"
+    assert data[1]["amount"] == -10000  # in kopecks
     assert data[1]["reference_id"] == order.id
 
-    assert data[2]["type"] == "deposit"
-    assert data[2]["amount_rubles"] == 1000.0
+    assert data[2]["entry_type"] == "deposit"
+    assert data[2]["amount"] == 100000  # in kopecks
 
 
 @pytest.mark.integration
@@ -279,7 +279,7 @@ def test_get_transactions_only_own_transactions(test_client, test_db_session, sa
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1  # Only sample_user's transaction
-    assert data[0]["amount_rubles"] == 100.0  # sample_user's deposit
+    assert data[0]["amount"] == 10000  # sample_user's deposit in kopecks
 
 
 @pytest.mark.integration
@@ -338,7 +338,7 @@ def test_get_transactions_description_formats(test_client, test_db_session, samp
     data = response.json()
 
     # Find each type and verify description (Russian descriptions)
-    types_found = {t["type"]: t["description"] for t in data}
+    types_found = {t["entry_type"]: t["description"] for t in data}
 
     assert "deposit" in types_found
     assert "Пополнение: +1000.00₽" in types_found["deposit"]

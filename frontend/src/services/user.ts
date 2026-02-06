@@ -24,7 +24,7 @@ export async function getCurrentUser(): Promise<UserProfile> {
  * Get user's ledger entries (transaction history)
  */
 export async function getUserLedger(): Promise<LedgerEntry[]> {
-  return api.get<LedgerEntry[]>('/ledger/');
+  return api.get<LedgerEntry[]>('/ledger/transactions');
 }
 
 /**
