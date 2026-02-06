@@ -53,7 +53,11 @@ class Settings(BaseSettings):
     
     # Monitoring (Optional)
     SENTRY_DSN: str | None = None
-    
+
+    # TON Blockchain Integration
+    TON_INDEXER_ENABLED: bool = True  # Set to False to disable in dev
+    TONCENTER_API_KEY: str | None = None  # Optional API key for higher rate limits
+
     # Pydantic Settings Configuration
     model_config = SettingsConfigDict(
         env_file=".env",

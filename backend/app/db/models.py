@@ -40,6 +40,7 @@ class User(Base):
     # Relationships
     orders = relationship("Order", back_populates="user")
     ledger_entries = relationship("LedgerEntry", back_populates="user")
+    ton_transactions = relationship("TonTransaction", back_populates="user")
 
     def __repr__(self):
         return f"<User(id={self.id}, telegram_id={self.telegram_id}, first_name='{self.first_name}')>"
@@ -232,6 +233,62 @@ class Trade(Base):
     def amount_rubles(self) -> float:
         """Сумма в рублях"""
         return self.amount_kopecks / 100
+
+
+class TonTransaction(Base):
+    """
+    TON blockchain transaction record
+
+    Отслеживает обработанные транзакции для предотвращения
+    двойного зачисления и аудита.
+    """
+    __tablename__ = "ton_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Transaction identification (unique on blockchain)
+    tx_hash = Column(String(64), unique=True, nullable=False, index=True)
+    lt = Column(BigInteger, nullable=False)  # Logical time
+
+    # Transaction details
+    sender_address = Column(String(68), nullable=False)  # TON address
+    amount_nanoton = Column(BigInteger, nullable=False)
+
+    # Parsed memo data
+    telegram_id = Column(BigInteger, nullable=False, index=True)
+
+    # Processing status
+    status = Column(String(20), default='pending', nullable=False, index=True)
+    # pending - detected but not processed
+    # confirmed - confirmed on blockchain
+    # credited - balance credited to user
+    # failed - processing failed
+
+    # Links to our system
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    ledger_entry_id = Column(Integer, ForeignKey("ledger.id"), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=utcnow)
+    processed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="ton_transactions")
+    ledger_entry = relationship("LedgerEntry")
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'confirmed', 'credited', 'failed')", name='ton_tx_valid_status'),
+        CheckConstraint('amount_nanoton > 0', name='ton_tx_positive_amount'),
+        Index('idx_ton_tx_status_created', 'status', 'created_at'),
+    )
+
+    def __repr__(self):
+        return f"<TonTransaction(hash={self.tx_hash[:16]}..., amount={self.amount_nanoton/1e9:.4f} TON, status={self.status})>"
+
+    @property
+    def amount_ton(self) -> float:
+        """Amount in TON"""
+        return self.amount_nanoton / 1e9
 
 
 # В будущем добавим:

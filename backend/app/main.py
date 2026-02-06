@@ -70,9 +70,22 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Skipping create_all — using Alembic migrations")
 
+    # Start TON deposit indexer (if enabled)
+    if settings.TON_INDEXER_ENABLED:
+        from app.ton.indexer import start_deposit_indexer
+        await start_deposit_indexer()
+        logger.info("TON deposit indexer started")
+    else:
+        logger.info("TON deposit indexer disabled (TON_INDEXER_ENABLED=False)")
+
     yield
 
-    # Shutdown (if needed)
+    # Shutdown
+    if settings.TON_INDEXER_ENABLED:
+        from app.ton.indexer import stop_deposit_indexer
+        await stop_deposit_indexer()
+        logger.info("TON deposit indexer stopped")
+
     logger.info("Shutting down Pravda Market API")
 
 
