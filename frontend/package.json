@@ -20,6 +20,9 @@
   "dependencies": {
     "@telegram-apps/telegram-ui": "^2.1.9",
     "@tma.js/sdk-react": "^3.0.8",
+    "@ton/core": "^0.63.0",
+    "@ton/crypto": "^3.3.0",
+    "@ton/ton": "^16.1.0",
     "@tonconnect/ui-react": "^2.2.0",
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.3.1",
