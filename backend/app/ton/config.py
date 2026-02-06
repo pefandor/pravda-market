@@ -22,6 +22,14 @@ class TonSettings(BaseSettings):
     MIN_DEPOSIT_NANOTON: int = 100_000_000  # 0.1 TON in nanoTON
     MIN_DEPOSIT_TON: float = 0.1
 
+    # Withdrawal settings
+    MIN_WITHDRAWAL_NANOTON: int = 1_000_000_000  # 1 TON minimum
+    MIN_WITHDRAWAL_TON: float = 1.0
+    WITHDRAWAL_FEE_NANOTON: int = 50_000_000  # 0.05 TON fee
+    WITHDRAWAL_FEE_TON: float = 0.05
+    MAX_WITHDRAWAL_PER_DAY_NANOTON: int = 1_000_000_000_000  # 1000 TON daily limit
+    MAX_WITHDRAWAL_PER_DAY_TON: float = 1000.0
+
     # Indexer settings
     POLLING_INTERVAL_SECONDS: int = 10
     MAX_TRANSACTIONS_PER_POLL: int = 50

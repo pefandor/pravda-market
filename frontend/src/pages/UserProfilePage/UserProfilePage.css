@@ -449,3 +449,222 @@
   font-family: var(--pm-font-mono, 'SF Mono', monospace);
   opacity: 0.7;
 }
+
+/* ========================================
+   WITHDRAWAL SECTION
+   ======================================== */
+
+.user-profile-page__withdraw {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(249, 115, 22, 0.15) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--pm-radius-xl, 20px);
+  padding: 24px;
+  margin: 0 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.user-profile-page__withdraw::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -30%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.2) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.user-profile-page__withdraw-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.user-profile-page__withdraw-icon {
+  font-size: 40px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.user-profile-page__withdraw-text {
+  flex: 1;
+}
+
+.user-profile-page__withdraw-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color);
+  margin: 0 0 4px 0;
+}
+
+.user-profile-page__withdraw-subtitle {
+  font-size: 13px;
+  color: var(--tg-theme-hint-color);
+  margin: 0;
+}
+
+/* ----- Withdraw Form ----- */
+
+.user-profile-page__withdraw-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.user-profile-page__withdraw-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.user-profile-page__withdraw-input {
+  width: 100%;
+  padding: 14px 60px 14px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--pm-radius-lg, 16px);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color);
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
+  transition: all 0.3s ease;
+}
+
+.user-profile-page__withdraw-input--address {
+  padding-right: 16px;
+  font-size: 14px;
+}
+
+.user-profile-page__withdraw-input::placeholder {
+  color: var(--tg-theme-hint-color);
+  opacity: 0.6;
+}
+
+.user-profile-page__withdraw-input:focus {
+  outline: none;
+  border-color: rgba(239, 68, 68, 0.6);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+
+.user-profile-page__withdraw-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.user-profile-page__withdraw-currency {
+  position: absolute;
+  right: 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pm-no-color, #EF4444);
+  text-transform: uppercase;
+}
+
+/* ----- Withdraw Button ----- */
+
+.user-profile-page__withdraw-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #EF4444 0%, #F97316 100%);
+  color: white;
+  border: none;
+  border-radius: var(--pm-radius-lg, 16px);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.user-profile-page__withdraw-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.45);
+}
+
+.user-profile-page__withdraw-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.user-profile-page__withdraw-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ----- Pending Withdrawals ----- */
+
+.user-profile-page__pending-withdrawals {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-profile-page__pending-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color);
+  margin: 0 0 12px 0;
+}
+
+.user-profile-page__pending-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--pm-radius-md, 12px);
+  margin-bottom: 8px;
+}
+
+.user-profile-page__pending-item:last-child {
+  margin-bottom: 0;
+}
+
+.user-profile-page__pending-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-profile-page__pending-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color);
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
+}
+
+.user-profile-page__pending-status {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+}
+
+.user-profile-page__pending-cancel {
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: var(--pm-radius-md, 12px);
+  font-size: 13px;
+  font-weight: 600;
+  color: #EF4444;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-profile-page__pending-cancel:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.user-profile-page__pending-cancel:active {
+  transform: scale(0.95);
+}

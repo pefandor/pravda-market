@@ -2,12 +2,21 @@ import { FC, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Section, Cell, List, Spinner, Placeholder } from '@telegram-apps/telegram-ui';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
-import type { UserProfile, LedgerEntry } from '@/types/api';
+import type { UserProfile, LedgerEntry, WithdrawalRequest } from '@/types/api';
 import { getUserProfile, getUserLedger } from '@/services/user';
 import { Page } from '@/components/Page';
 import { formatCurrency, formatTimestamp } from '@/utils/formatting';
 import { sanitizeText } from '@/utils/sanitize';
-import { createDepositTransaction, MIN_DEPOSIT_TON, ESCROW_ADDRESS } from '@/services/ton';
+import {
+  createDepositTransaction,
+  MIN_DEPOSIT_TON,
+  ESCROW_ADDRESS,
+  MIN_WITHDRAWAL_TON,
+  WITHDRAWAL_FEE_TON,
+  createWithdrawal,
+  getWithdrawals,
+  cancelWithdrawal,
+} from '@/services/ton';
 
 import './UserProfilePage.css';
 
@@ -17,6 +26,8 @@ function getLedgerEntryLabel(type: string): string {
   const labels: Record<string, string> = {
     deposit: 'Пополнение',
     withdraw: 'Вывод',
+    withdrawal_pending: 'Вывод (ожидание)',
+    withdrawal_cancelled: 'Вывод отменён',
     order_lock: 'Блокировка (ордер)',
     order_unlock: 'Разблокировка',
     trade_lock: 'Блокировка (сделка)',
@@ -24,6 +35,17 @@ function getLedgerEntryLabel(type: string): string {
     settlement_loss: 'Проигрыш',
   };
   return labels[type] || type;
+}
+
+function getWithdrawalStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: '⏳ Ожидание',
+    processing: '⚙️ Обработка',
+    completed: '✅ Выполнено',
+    failed: '❌ Ошибка',
+    cancelled: '🚫 Отменено',
+  };
+  return labels[status] || status;
 }
 
 export const UserProfilePage: FC = () => {
@@ -40,6 +62,12 @@ export const UserProfilePage: FC = () => {
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [depositLoading, setDepositLoading] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Withdrawal state
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+  const [withdrawAddress, setWithdrawAddress] = useState<string>('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [pendingWithdrawals, setPendingWithdrawals] = useState<WithdrawalRequest[]>([]);
 
   useEffect(() => {
     loadUserData();
@@ -93,16 +121,69 @@ export const UserProfilePage: FC = () => {
     }
   }, [profile, depositAmount, wallet, tonConnectUI]);
 
+  const handleWithdraw = useCallback(async () => {
+    if (!profile) return;
+
+    const amount = parseFloat(withdrawAmount);
+    if (isNaN(amount) || amount < MIN_WITHDRAWAL_TON) {
+      setToast({ type: 'error', message: `Минимум ${MIN_WITHDRAWAL_TON} TON` });
+      return;
+    }
+
+    // Use connected wallet address or entered address
+    const address = withdrawAddress || wallet?.account.address;
+    if (!address) {
+      setToast({ type: 'error', message: 'Введите адрес кошелька' });
+      return;
+    }
+
+    try {
+      setWithdrawLoading(true);
+
+      const withdrawal = await createWithdrawal(address, amount);
+
+      setToast({
+        type: 'success',
+        message: `Заявка на вывод ${amount} TON создана. ${withdrawal.estimated_time}`,
+      });
+      setWithdrawAmount('');
+      setWithdrawAddress('');
+
+      // Reload data
+      loadUserData();
+    } catch (err) {
+      console.error('Withdrawal failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Не удалось создать заявку';
+      setToast({ type: 'error', message: errorMessage });
+    } finally {
+      setWithdrawLoading(false);
+    }
+  }, [profile, withdrawAmount, withdrawAddress, wallet]);
+
+  const handleCancelWithdrawal = useCallback(async (id: number) => {
+    try {
+      await cancelWithdrawal(id);
+      setToast({ type: 'success', message: 'Заявка отменена' });
+      loadUserData();
+    } catch (err) {
+      console.error('Cancel failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Не удалось отменить';
+      setToast({ type: 'error', message: errorMessage });
+    }
+  }, []);
+
   const loadUserData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const [profileData, ledgerData] = await Promise.all([
+      const [profileData, ledgerData, withdrawalsData] = await Promise.all([
         getUserProfile(),
         getUserLedger(),
+        getWithdrawals(10, 0, 'pending').catch(() => ({ withdrawals: [], total: 0 })),
       ]);
       setProfile(profileData);
       setLedger(ledgerData);
+      setPendingWithdrawals(withdrawalsData.withdrawals);
     } catch (err) {
       console.error('Failed to load user data:', err);
       setError(err instanceof Error ? err.message : 'Не удалось загрузить данные пользователя');
@@ -231,6 +312,83 @@ export const UserProfilePage: FC = () => {
             <p className="user-profile-page__deposit-address">
               Контракт: {ESCROW_ADDRESS.slice(0, 12)}...
             </p>
+          </div>
+        </Section>
+
+        {/* Withdrawal Section */}
+        <Section header="Вывести средства">
+          <div className="user-profile-page__withdraw">
+            <div className="user-profile-page__withdraw-info">
+              <span className="user-profile-page__withdraw-icon">💸</span>
+              <div className="user-profile-page__withdraw-text">
+                <p className="user-profile-page__withdraw-title">TON Withdrawal</p>
+                <p className="user-profile-page__withdraw-subtitle">
+                  Комиссия: {WITHDRAWAL_FEE_TON} TON • Мин: {MIN_WITHDRAWAL_TON} TON
+                </p>
+              </div>
+            </div>
+
+            <div className="user-profile-page__withdraw-form">
+              <div className="user-profile-page__withdraw-input-wrapper">
+                <input
+                  type="text"
+                  className="user-profile-page__withdraw-input user-profile-page__withdraw-input--address"
+                  placeholder={wallet ? `${wallet.account.address.slice(0, 8)}...` : 'TON адрес'}
+                  value={withdrawAddress}
+                  onChange={(e) => setWithdrawAddress(e.target.value)}
+                  disabled={withdrawLoading}
+                />
+              </div>
+
+              <div className="user-profile-page__withdraw-input-wrapper">
+                <input
+                  type="number"
+                  className="user-profile-page__withdraw-input"
+                  placeholder={`Мин. ${MIN_WITHDRAWAL_TON}`}
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  min={MIN_WITHDRAWAL_TON}
+                  step="0.1"
+                  disabled={withdrawLoading}
+                />
+                <span className="user-profile-page__withdraw-currency">TON</span>
+              </div>
+
+              <button
+                className="user-profile-page__withdraw-button"
+                onClick={handleWithdraw}
+                disabled={withdrawLoading || !withdrawAmount}
+              >
+                {withdrawLoading ? <Spinner size="s" /> : 'Вывести'}
+              </button>
+            </div>
+
+            {/* Pending Withdrawals */}
+            {pendingWithdrawals.length > 0 && (
+              <div className="user-profile-page__pending-withdrawals">
+                <p className="user-profile-page__pending-title">Активные заявки:</p>
+                {pendingWithdrawals.map((w) => (
+                  <div key={w.id} className="user-profile-page__pending-item">
+                    <div className="user-profile-page__pending-info">
+                      <span className="user-profile-page__pending-amount">
+                        {w.amount_ton.toFixed(2)} TON
+                      </span>
+                      <span className="user-profile-page__pending-status">
+                        {getWithdrawalStatusLabel(w.status)}
+                      </span>
+                    </div>
+                    {w.status === 'pending' && (
+                      <button
+                        className="user-profile-page__pending-cancel"
+                        onClick={() => handleCancelWithdrawal(w.id)}
+                      >
+                        Отмена
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Section>
 

@@ -75,3 +75,80 @@ export function getExplorerUrl(txHash: string, testnet = true): string {
     : 'https://tonscan.org/tx';
   return `${baseUrl}/${txHash}`;
 }
+
+// ============================================================================
+// Withdrawal API Functions
+// ============================================================================
+
+import { api } from './api';
+import type {
+  WithdrawalRequest,
+  CreateWithdrawalRequest,
+  WithdrawalListResponse,
+} from '@/types/api';
+
+// Withdrawal constants
+export const MIN_WITHDRAWAL_TON = 1.0;
+export const WITHDRAWAL_FEE_TON = 0.05;
+export const MAX_WITHDRAWAL_PER_DAY_TON = 1000;
+
+/**
+ * Create a withdrawal request
+ *
+ * @param tonAddress - Destination TON wallet address
+ * @param amountTon - Amount to withdraw in TON
+ * @returns Withdrawal request details
+ */
+export async function createWithdrawal(
+  tonAddress: string,
+  amountTon: number
+): Promise<WithdrawalRequest> {
+  const request: CreateWithdrawalRequest = {
+    ton_address: tonAddress,
+    amount_ton: amountTon,
+  };
+  return api.post<WithdrawalRequest>('/withdrawals', request);
+}
+
+/**
+ * Get list of user's withdrawal requests
+ *
+ * @param limit - Max results (default 20)
+ * @param offset - Pagination offset
+ * @param status - Filter by status
+ * @returns List of withdrawals with total count
+ */
+export async function getWithdrawals(
+  limit = 20,
+  offset = 0,
+  status?: string
+): Promise<WithdrawalListResponse> {
+  const params = new URLSearchParams();
+  params.set('limit', limit.toString());
+  params.set('offset', offset.toString());
+  if (status) params.set('status', status);
+
+  return api.get<WithdrawalListResponse>(`/withdrawals?${params.toString()}`);
+}
+
+/**
+ * Get a specific withdrawal request
+ *
+ * @param id - Withdrawal request ID
+ * @returns Withdrawal request details
+ */
+export async function getWithdrawal(id: number): Promise<WithdrawalRequest> {
+  return api.get<WithdrawalRequest>(`/withdrawals/${id}`);
+}
+
+/**
+ * Cancel a pending withdrawal request
+ *
+ * @param id - Withdrawal request ID
+ * @returns Success message
+ */
+export async function cancelWithdrawal(
+  id: number
+): Promise<{ message: string; id: number }> {
+  return api.delete<{ message: string; id: number }>(`/withdrawals/${id}`);
+}

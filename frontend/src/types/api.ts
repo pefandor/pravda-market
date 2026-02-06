@@ -129,4 +129,33 @@ export type LedgerEntryType =
   | 'payout'
   | 'fee'
   | 'admin_deposit'
-  | 'welcome_bonus';
+  | 'welcome_bonus'
+  | 'withdrawal_pending'
+  | 'withdrawal_cancelled';
+
+// ============================================================================
+// Withdrawal Types
+// ============================================================================
+
+export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+
+export interface WithdrawalRequest {
+  id: number;
+  ton_address: string;
+  amount_ton: number;
+  status: WithdrawalStatus;
+  tx_hash: string | null;
+  created_at: string;
+  processed_at: string | null;
+  estimated_time: string | null;
+}
+
+export interface CreateWithdrawalRequest {
+  ton_address: string;
+  amount_ton: number;
+}
+
+export interface WithdrawalListResponse {
+  withdrawals: WithdrawalRequest[];
+  total: number;
+}

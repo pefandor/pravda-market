@@ -41,6 +41,7 @@ class User(Base):
     orders = relationship("Order", back_populates="user")
     ledger_entries = relationship("LedgerEntry", back_populates="user")
     ton_transactions = relationship("TonTransaction", back_populates="user")
+    withdrawal_requests = relationship("WithdrawalRequest", back_populates="user")
 
     def __repr__(self):
         return f"<User(id={self.id}, telegram_id={self.telegram_id}, first_name='{self.first_name}')>"
@@ -284,6 +285,68 @@ class TonTransaction(Base):
 
     def __repr__(self):
         return f"<TonTransaction(hash={self.tx_hash[:16]}..., amount={self.amount_nanoton/1e9:.4f} TON, status={self.status})>"
+
+    @property
+    def amount_ton(self) -> float:
+        """Amount in TON"""
+        return self.amount_nanoton / 1e9
+
+
+class WithdrawalRequest(Base):
+    """
+    Withdrawal request for TON
+
+    Заявка на вывод средств через TON блокчейн.
+    Обрабатывается оператором через batch withdrawals.
+    """
+    __tablename__ = "withdrawal_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # Destination address
+    ton_address = Column(String(68), nullable=False)
+
+    # Amount to withdraw (in nanoTON)
+    amount_nanoton = Column(BigInteger, nullable=False)
+
+    # Processing status
+    status = Column(String(20), default='pending', nullable=False, index=True)
+    # pending - waiting for processing
+    # processing - operator is processing
+    # completed - successfully sent
+    # failed - processing failed
+    # cancelled - cancelled by user or admin
+
+    # Transaction hash (filled after sending)
+    tx_hash = Column(String(64), nullable=True, unique=True)
+
+    # Error message (if failed)
+    error_message = Column(Text, nullable=True)
+
+    # Links to ledger
+    ledger_entry_id = Column(Integer, ForeignKey("ledger.id"), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=utcnow)
+    processed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="withdrawal_requests")
+    ledger_entry = relationship("LedgerEntry")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')",
+            name='withdrawal_valid_status'
+        ),
+        CheckConstraint('amount_nanoton > 0', name='withdrawal_positive_amount'),
+        Index('idx_withdrawal_status_created', 'status', 'created_at'),
+        Index('idx_withdrawal_user_status', 'user_id', 'status'),
+    )
+
+    def __repr__(self):
+        return f"<WithdrawalRequest(id={self.id}, user_id={self.user_id}, amount={self.amount_ton:.4f} TON, status={self.status})>"
 
     @property
     def amount_ton(self) -> float:
