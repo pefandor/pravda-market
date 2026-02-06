@@ -104,8 +104,8 @@ export async function getUsers(): Promise<AdminUser[]> {
 export async function depositToUser(
   telegramId: number,
   amount: number
-): Promise<{ message: string; new_balance: number }> {
-  return adminFetch<{ message: string; new_balance: number }>(
+): Promise<{ success: boolean; new_balance_rubles: number }> {
+  return adminFetch<{ success: boolean; new_balance_rubles: number }>(
     `/admin/users/${telegramId}/deposit`,
     {
       method: 'POST',

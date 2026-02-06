@@ -111,7 +111,7 @@ export const AdminPage: FC = () => {
       setLoading(true);
       setError(null);
       const result = await depositToUser(telegramId, amount);
-      setSuccess(`Депозит ${amount}₽ выполнен. Новый баланс: ${result.new_balance}₽`);
+      setSuccess(`Депозит ${amount}₽ выполнен. Новый баланс: ${result.new_balance_rubles}₽`);
       setDepositTelegramId('');
       setDepositAmount('');
       await loadData();

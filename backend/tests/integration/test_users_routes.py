@@ -20,11 +20,16 @@ def test_get_profile_success(test_client, mock_init_data):
     # Assert
     assert response.status_code == 200
     data = response.json()
-    assert data["telegram_id"] == 123
-    assert data["username"] == "test"
-    assert data["first_name"] == "Test"
-    assert "id" in data
-    assert "created_at" in data
+    # Profile now has nested user object and balance
+    assert "user" in data
+    assert "balance" in data
+    assert data["user"]["telegram_id"] == 123
+    assert data["user"]["username"] == "test"
+    assert data["user"]["first_name"] == "Test"
+    assert "id" in data["user"]
+    assert "created_at" in data["user"]
+    # New users get welcome bonus of 1000 rubles = 100000 kopecks
+    assert data["balance"] == 100000
 
 
 @pytest.mark.integration
@@ -84,17 +89,17 @@ def test_user_auto_registration_flow(test_client, mock_init_data):
     response1 = test_client.get("/user/profile", headers=headers)
     assert response1.status_code == 200
     data1 = response1.json()
-    user_id_1 = data1["id"]
+    user_id_1 = data1["user"]["id"]
 
     # Second request - should return same user
     response2 = test_client.get("/user/profile", headers=headers)
     assert response2.status_code == 200
     data2 = response2.json()
-    user_id_2 = data2["id"]
+    user_id_2 = data2["user"]["id"]
 
     # Verify user_id is consistent
     assert user_id_1 == user_id_2
-    assert data1["telegram_id"] == data2["telegram_id"] == 999999
+    assert data1["user"]["telegram_id"] == data2["user"]["telegram_id"] == 999999
 
 
 @pytest.mark.integration
@@ -115,17 +120,23 @@ def test_profile_fields_correct(test_client, mock_init_data):
     assert response.status_code == 200
     data = response.json()
 
-    # Check all expected fields exist
-    expected_fields = ["id", "telegram_id", "username", "first_name", "created_at"]
+    # Check top-level fields
+    assert "user" in data
+    assert "balance" in data
+    assert isinstance(data["balance"], int)  # balance in kopecks
+
+    # Check all expected user fields exist
+    user = data["user"]
+    expected_fields = ["id", "telegram_id", "username", "first_name", "created_at", "updated_at"]
     for field in expected_fields:
-        assert field in data, f"Missing field: {field}"
+        assert field in user, f"Missing field: {field}"
 
     # Check data types
-    assert isinstance(data["id"], int)
-    assert isinstance(data["telegram_id"], int)
-    assert isinstance(data["username"], str)
-    assert isinstance(data["first_name"], str)
-    assert isinstance(data["created_at"], str)  # ISO format string
+    assert isinstance(user["id"], int)
+    assert isinstance(user["telegram_id"], int)
+    assert isinstance(user["username"], str)
+    assert isinstance(user["first_name"], str)
+    assert isinstance(user["created_at"], str)  # ISO format string
 
     # Verify created_at is ISO format (basic check)
-    assert "T" in data["created_at"] or "-" in data["created_at"]
+    assert "T" in user["created_at"] or "-" in user["created_at"]

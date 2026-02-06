@@ -36,10 +36,14 @@ export async function getBetTrades(betId: number): Promise<Trade[]> {
 
 /**
  * Get user's orders
- * @param userId Optional user ID filter
+ * @param userId Optional user ID filter (not used - backend returns current user's orders)
  */
 export async function getUserOrders(userId?: number): Promise<Order[]> {
-  const endpoint = userId ? `/bets/?user_id=${userId}` : '/bets/';
+  // Backend endpoint is /bets/orders (not /bets/)
+  const params = new URLSearchParams();
+  if (userId) params.set('user_id', userId.toString());
+  const query = params.toString();
+  const endpoint = query ? `/bets/orders?${query}` : '/bets/orders';
   return api.get<Order[]>(endpoint);
 }
 
