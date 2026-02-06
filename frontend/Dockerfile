@@ -14,7 +14,9 @@ COPY . .
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npm run build
+# Cache buster - change this to force rebuild
+ARG CACHE_BUST=2026-02-06-v3
+RUN echo "Build: $CACHE_BUST" && npm run build
 
 # Stage 2: Serve with nginx
 FROM nginx:1.27-alpine
