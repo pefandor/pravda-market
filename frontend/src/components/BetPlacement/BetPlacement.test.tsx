@@ -144,11 +144,9 @@ describe('BetPlacement', () => {
     const user = userEvent.setup();
     const mockPlaceBet = vi.mocked(betsService.placeBet);
     mockPlaceBet.mockResolvedValue({
-      success: true,
       order_id: 456,
-      status: 'filled',
-      filled: 100,
-      trades: [],
+      message: 'Order placed successfully',
+      matched_trades: [],
     });
 
     render(<BetPlacement marketId={marketId} onSuccess={mockOnSuccess} />);
@@ -197,11 +195,9 @@ describe('BetPlacement', () => {
     // Mock slow API call
     mockPlaceBet.mockImplementation(
       () => new Promise(resolve => setTimeout(() => resolve({
-        success: true,
         order_id: 456,
-        status: 'filled',
-        filled: 100,
-        trades: [],
+        message: 'Order placed successfully',
+        matched_trades: [],
       }), 100))
     );
 
@@ -219,11 +215,9 @@ describe('BetPlacement', () => {
     const user = userEvent.setup();
     const mockPlaceBet = vi.mocked(betsService.placeBet);
     mockPlaceBet.mockResolvedValue({
-      success: true,
       order_id: 456,
-      status: 'filled',
-      filled: 100,
-      trades: [],
+      message: 'Order placed successfully',
+      matched_trades: [],
     });
 
     render(<BetPlacement marketId={marketId} />);

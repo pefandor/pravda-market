@@ -49,7 +49,7 @@ export interface Order {
 export interface LedgerEntry {
   id: number;
   user_id: number;
-  entry_type: 'deposit' | 'withdraw' | 'order_lock' | 'order_unlock' | 'trade_lock' | 'settlement_win' | 'settlement_loss';
+  entry_type: 'deposit' | 'order_lock' | 'order_unlock' | 'trade' | 'trade_lock' | 'payout' | 'fee' | 'admin_deposit' | 'welcome_bonus';
   amount: number;    // in kopecks (can be negative)
   balance_after: number | null;
   order_id: number | null;
@@ -122,9 +122,11 @@ export type Side = 'yes' | 'no';
 export type OrderStatus = 'open' | 'filled' | 'cancelled';
 export type LedgerEntryType =
   | 'deposit'
-  | 'withdraw'
   | 'order_lock'
   | 'order_unlock'
+  | 'trade'
   | 'trade_lock'
-  | 'settlement_win'
-  | 'settlement_loss';
+  | 'payout'
+  | 'fee'
+  | 'admin_deposit'
+  | 'welcome_bonus';

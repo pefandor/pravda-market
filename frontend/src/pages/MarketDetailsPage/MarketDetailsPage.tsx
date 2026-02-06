@@ -54,7 +54,13 @@ export const MarketDetailsPage: FC = () => {
 
   useEffect(() => {
     if (marketId) {
-      loadMarketData(parseInt(marketId));
+      const parsedId = parseInt(marketId);
+      if (isNaN(parsedId)) {
+        setError('Invalid market ID');
+        setLoading(false);
+        return;
+      }
+      loadMarketData(parsedId);
     }
   }, [marketId]);
 
@@ -81,9 +87,12 @@ export const MarketDetailsPage: FC = () => {
   const handleBetSuccess = () => {
     // Reload orderbook after successful bet placement
     if (marketId) {
-      getOrderbook(parseInt(marketId))
-        .then(setOrderbook)
-        .catch(console.error);
+      const parsedId = parseInt(marketId);
+      if (!isNaN(parsedId)) {
+        getOrderbook(parsedId)
+          .then(setOrderbook)
+          .catch(console.error);
+      }
     }
   };
 
