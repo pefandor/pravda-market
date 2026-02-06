@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import hmac
 
 from app.db.session import get_db
-from app.db.models import Market, User, LedgerEntry
+from app.db.models import Market, User, LedgerEntry, WithdrawalRequest
 from app.core.rate_limit import limiter
 from app.core.logging_config import get_logger
 from app.core.config import settings
@@ -457,4 +457,215 @@ async def admin_deposit(
         "user_id": user.id,
         "deposited_rubles": deposit_request.amount,
         "new_balance_rubles": new_balance / 100
+    }
+
+
+# ============================================================================
+# WITHDRAWAL MANAGEMENT ENDPOINTS
+# ============================================================================
+
+class PendingWithdrawalResponse(BaseModel):
+    """Pending withdrawal for batch processing"""
+    id: int
+    user_id: int
+    telegram_id: int
+    ton_address: str
+    amount_nanoton: int
+    amount_ton: float
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProcessWithdrawalsRequest(BaseModel):
+    """Request to mark withdrawals as processing"""
+    ids: List[int] = Field(..., min_length=1, max_length=50)
+
+
+class CompleteWithdrawalsRequest(BaseModel):
+    """Request to mark withdrawals as completed"""
+    ids: List[int] = Field(..., min_length=1, max_length=50)
+    tx_hash: str = Field(..., min_length=32, max_length=64)
+
+
+@router.get("/withdrawals/pending", response_model=List[PendingWithdrawalResponse])
+@limiter.limit("30/minute")
+async def list_pending_withdrawals(
+    request: Request,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    is_admin: bool = Depends(get_admin_user)
+) -> List[PendingWithdrawalResponse]:
+    """
+    List pending withdrawal requests for batch processing
+
+    Admin-only endpoint for the batch withdrawal script.
+    Returns pending withdrawals sorted by creation time.
+    """
+    limit = min(max(limit, 1), 100)
+
+    withdrawals = db.query(WithdrawalRequest).filter(
+        WithdrawalRequest.status == 'pending'
+    ).order_by(
+        WithdrawalRequest.created_at.asc()
+    ).limit(limit).all()
+
+    result = []
+    for w in withdrawals:
+        user = db.query(User).filter(User.id == w.user_id).first()
+        result.append(PendingWithdrawalResponse(
+            id=w.id,
+            user_id=w.user_id,
+            telegram_id=user.telegram_id if user else 0,
+            ton_address=w.ton_address,
+            amount_nanoton=w.amount_nanoton,
+            amount_ton=w.amount_nanoton / 1e9,
+            created_at=w.created_at
+        ))
+
+    return result
+
+
+@router.post("/withdrawals/process", response_model=Dict[str, Any])
+@limiter.limit("10/minute")
+async def mark_withdrawals_processing(
+    request: Request,
+    body: ProcessWithdrawalsRequest,
+    db: Session = Depends(get_db),
+    is_admin: bool = Depends(get_admin_user)
+) -> Dict[str, Any]:
+    """
+    Mark withdrawals as processing (being sent to blockchain)
+
+    Admin-only endpoint. Called by batch withdrawal script
+    before sending the transaction.
+    """
+    updated = 0
+    for withdrawal_id in body.ids:
+        withdrawal = db.query(WithdrawalRequest).filter(
+            WithdrawalRequest.id == withdrawal_id,
+            WithdrawalRequest.status == 'pending'
+        ).first()
+
+        if withdrawal:
+            withdrawal.status = 'processing'
+            updated += 1
+
+    db.commit()
+
+    logger.info("Withdrawals marked as processing", extra={
+        "ids": body.ids,
+        "updated_count": updated
+    })
+
+    return {
+        "success": True,
+        "updated_count": updated,
+        "ids": body.ids
+    }
+
+
+@router.post("/withdrawals/complete", response_model=Dict[str, Any])
+@limiter.limit("10/minute")
+async def complete_withdrawals(
+    request: Request,
+    body: CompleteWithdrawalsRequest,
+    db: Session = Depends(get_db),
+    is_admin: bool = Depends(get_admin_user)
+) -> Dict[str, Any]:
+    """
+    Mark withdrawals as completed with transaction hash
+
+    Admin-only endpoint. Called by batch withdrawal script
+    after the transaction is confirmed.
+    """
+    updated = 0
+    now = datetime.now(timezone.utc)
+
+    for withdrawal_id in body.ids:
+        withdrawal = db.query(WithdrawalRequest).filter(
+            WithdrawalRequest.id == withdrawal_id,
+            WithdrawalRequest.status == 'processing'
+        ).first()
+
+        if withdrawal:
+            withdrawal.status = 'completed'
+            withdrawal.tx_hash = body.tx_hash
+            withdrawal.processed_at = now
+            updated += 1
+
+    db.commit()
+
+    logger.info("Withdrawals completed", extra={
+        "ids": body.ids,
+        "tx_hash": body.tx_hash,
+        "updated_count": updated
+    })
+
+    return {
+        "success": True,
+        "updated_count": updated,
+        "tx_hash": body.tx_hash,
+        "ids": body.ids
+    }
+
+
+@router.post("/withdrawals/fail", response_model=Dict[str, Any])
+@limiter.limit("10/minute")
+async def fail_withdrawals(
+    request: Request,
+    body: ProcessWithdrawalsRequest,  # Reuse same schema
+    error_message: str = "Transaction failed",
+    db: Session = Depends(get_db),
+    is_admin: bool = Depends(get_admin_user)
+) -> Dict[str, Any]:
+    """
+    Mark withdrawals as failed and refund users
+
+    Admin-only endpoint. Called if blockchain transaction fails.
+    Refunds the locked amount back to users.
+    """
+    updated = 0
+    now = datetime.now(timezone.utc)
+
+    for withdrawal_id in body.ids:
+        withdrawal = db.query(WithdrawalRequest).filter(
+            WithdrawalRequest.id == withdrawal_id,
+            WithdrawalRequest.status == 'processing'
+        ).first()
+
+        if withdrawal:
+            # Mark as failed
+            withdrawal.status = 'failed'
+            withdrawal.error_message = error_message
+            withdrawal.processed_at = now
+
+            # Refund user
+            original_entry = db.query(LedgerEntry).filter(
+                LedgerEntry.id == withdrawal.ledger_entry_id
+            ).first()
+
+            if original_entry:
+                refund_entry = LedgerEntry(
+                    user_id=withdrawal.user_id,
+                    amount_kopecks=-original_entry.amount_kopecks,
+                    type='withdrawal_refund',
+                    reference_id=withdrawal.id
+                )
+                db.add(refund_entry)
+
+            updated += 1
+
+    db.commit()
+
+    logger.info("Withdrawals failed and refunded", extra={
+        "ids": body.ids,
+        "error_message": error_message,
+        "updated_count": updated
+    })
+
+    return {
+        "success": True,
+        "updated_count": updated,
+        "ids": body.ids
     }
