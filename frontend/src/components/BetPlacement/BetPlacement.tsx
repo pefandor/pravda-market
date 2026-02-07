@@ -1,10 +1,10 @@
 /**
- * BetPlacement component
- * Form for placing bets on a market
+ * BetPlacement component - Premium betting UI
+ * Modern fintech-style form for placing bets
  */
 
 import { FC, useState, useCallback, useEffect, useMemo } from 'react';
-import { Button, Input, Section } from '@telegram-apps/telegram-ui';
+import { Section } from '@telegram-apps/telegram-ui';
 import type { Side } from '@/types/api';
 import { placeBet } from '@/services/bets';
 import { bem } from '@/css/bem';
@@ -22,18 +22,15 @@ export interface BetPlacementProps {
 const MIN_PRICE = 1;
 const MAX_PRICE = 99;
 const MIN_AMOUNT = 10;
+const QUICK_AMOUNTS = [10, 50, 100];
 
 export const BetPlacement: FC<BetPlacementProps> = ({ marketId, onSuccess }) => {
   const [side, setSide] = useState<Side>('yes');
-  const [price, setPrice] = useState<string>('50');
-  const [amount, setAmount] = useState<string>('100');
+  const [price, setPrice] = useState<number>(50);
+  const [amount, setAmount] = useState<number>(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  // Validation state
-  const [priceError, setPriceError] = useState<string | null>(null);
-  const [amountError, setAmountError] = useState<string | null>(null);
 
   // Auto-dismiss success message after 3 seconds
   useEffect(() => {
@@ -43,121 +40,68 @@ export const BetPlacement: FC<BetPlacementProps> = ({ marketId, onSuccess }) => 
     }
   }, [success]);
 
-  // Validate price input
-  const validatePrice = useCallback((value: string): string | null => {
-    if (value === '') return null;
-
-    const num = parseFloat(value);
-
-    if (isNaN(num)) {
-      return 'Введите число';
-    }
-
-    if (num < MIN_PRICE) {
-      return `Минимум ${MIN_PRICE}%`;
-    }
-
-    if (num > MAX_PRICE) {
-      return `Максимум ${MAX_PRICE}%`;
-    }
-
-    return null;
-  }, []);
-
-  // Validate amount input
-  const validateAmount = useCallback((value: string): string | null => {
-    if (value === '') return null;
-
-    const num = parseFloat(value);
-
-    if (isNaN(num)) {
-      return 'Введите число';
-    }
-
-    if (num < MIN_AMOUNT) {
-      return `Минимум ${MIN_AMOUNT} ₽`;
-    }
-
-    return null;
-  }, []);
-
-  // Handle price change with validation
+  // Handle price slider change
   const handlePriceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setPrice(value);
-    setPriceError(validatePrice(value));
-  }, [validatePrice]);
+    setPrice(parseInt(e.target.value) || 50);
+  }, []);
 
-  // Handle amount change with validation
+  // Handle amount input change
   const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setAmount(value);
-    setAmountError(validateAmount(value));
-  }, [validateAmount]);
+    const value = e.target.value.replace(/[^\d]/g, '');
+    setAmount(parseInt(value) || 0);
+  }, []);
+
+  // Quick amount buttons
+  const handleQuickAmount = useCallback((delta: number) => {
+    setAmount(prev => Math.max(MIN_AMOUNT, prev + delta));
+  }, []);
+
+  // MAX button - set to a reasonable max (could be user balance in future)
+  const handleMaxAmount = useCallback(() => {
+    setAmount(1000);
+  }, []);
 
   // Check if form is valid
   const isFormValid = useMemo(() => {
-    if (price === '' || amount === '') return false;
-    if (priceError || amountError) return false;
+    return price >= MIN_PRICE && price <= MAX_PRICE && amount >= MIN_AMOUNT;
+  }, [price, amount]);
 
-    const priceNum = parseFloat(price);
-    const amountNum = parseFloat(amount);
-
-    return (
-      !isNaN(priceNum) &&
-      priceNum >= MIN_PRICE &&
-      priceNum <= MAX_PRICE &&
-      !isNaN(amountNum) &&
-      amountNum >= MIN_AMOUNT
-    );
-  }, [price, amount, priceError, amountError]);
-
-  // Calculate potential profit
-  // Formula: profit = amount * (1 / priceDecimal) - amount
-  // Example: 100₽ @ 65% = 100 * (1/0.65) - 100 = 53.85₽
-  const potentialProfit = useMemo(() => {
-    const priceNum = parseFloat(price);
-    const amountNum = parseFloat(amount);
-
-    if (isNaN(priceNum) || isNaN(amountNum) || priceNum <= 0 || amountNum <= 0) {
-      return null;
+  // Calculate potential profit and multiplier
+  const { potentialProfit, multiplier, winChance } = useMemo(() => {
+    if (price <= 0 || amount <= 0) {
+      return { potentialProfit: 0, multiplier: 0, winChance: 0 };
     }
 
-    const priceDecimal = priceNum / 100; // Convert 65 -> 0.65
-    const profit = amountNum * (1 / priceDecimal) - amountNum;
-    return profit;
+    const priceDecimal = price / 100;
+    const mult = 1 / priceDecimal;
+    const profit = amount * mult - amount;
+
+    return {
+      potentialProfit: profit,
+      multiplier: mult,
+      winChance: price,
+    };
   }, [price, amount]);
 
   const handleSubmit = useCallback(async () => {
+    if (!isFormValid || loading) return;
+
     try {
       setLoading(true);
       setError(null);
       setSuccess(false);
 
-      // Final validation (should already be valid)
-      const priceNum = parseFloat(price);
-      const amountNum = parseFloat(amount);
-
-      if (!isFormValid) {
-        setError('Проверьте правильность введенных данных');
-        return;
-      }
-
-      // Send in API format (rubles and decimal price)
-      // Backend expects: price 0.01-0.99, amount in rubles
-      const priceDecimal = priceNum / 100;  // 50% -> 0.50
+      const priceDecimal = price / 100;
 
       await placeBet({
         market_id: marketId,
         side,
         price: priceDecimal,
-        amount: amountNum,  // Already in rubles
+        amount: amount,
       });
 
       setSuccess(true);
-      setAmount('100');
-      setPriceError(null);
-      setAmountError(null);
+      setAmount(100);
       onSuccess?.();
     } catch (err) {
       console.error('Failed to place bet:', err);
@@ -165,94 +109,111 @@ export const BetPlacement: FC<BetPlacementProps> = ({ marketId, onSuccess }) => 
     } finally {
       setLoading(false);
     }
-  }, [price, amount, marketId, side, isFormValid, onSuccess]);
+  }, [price, amount, marketId, side, isFormValid, loading, onSuccess]);
 
   return (
     <div className={b()}>
       <Section header="Разместить ставку">
         <div className={b('form')}>
-          {/* Side selection */}
-          <div className={b('field')}>
-            <label className={b('label')}>Выберите сторону</label>
-            <div className={b('side-buttons')}>
-              <Button
-                className={b('side-button', { active: side === 'yes' })}
-                mode={side === 'yes' ? 'filled' : 'outline'}
-                onClick={() => setSide('yes')}
-              >
-                ДА
-              </Button>
-              <Button
-                className={b('side-button', { active: side === 'no' })}
-                mode={side === 'no' ? 'filled' : 'outline'}
-                onClick={() => setSide('no')}
-              >
-                НЕТ
-              </Button>
-            </div>
+          {/* Side Selection - YES/NO */}
+          <div className={b('sides')}>
+            <button
+              type="button"
+              className={b('side-btn', { yes: true, active: side === 'yes' })}
+              onClick={() => setSide('yes')}
+            >
+              <span className={b('side-icon')}>↑</span>
+              <span className={b('side-text')}>ДА</span>
+            </button>
+            <button
+              type="button"
+              className={b('side-btn', { no: true, active: side === 'no' })}
+              onClick={() => setSide('no')}
+            >
+              <span className={b('side-icon')}>↓</span>
+              <span className={b('side-text')}>НЕТ</span>
+            </button>
           </div>
 
-          {/* Price slider */}
-          <div className={b('field')}>
-            <label className={b('label')} htmlFor="price-input">
-              Цена
-            </label>
-            <div className={b('slider-container')}>
-              <div className={b('slider-track')}>
-                <div
-                  className={b('slider-fill', side)}
-                  style={{ width: `${parseFloat(price) || 50}%` }}
-                />
-              </div>
-              <input
-                id="price-input"
-                type="range"
-                className={b('slider')}
-                value={price}
-                onChange={handlePriceChange}
-                min={MIN_PRICE}
-                max={MAX_PRICE}
-                step="1"
-              />
-              <div className={b('slider-value', side)}>
+          {/* Price Slider */}
+          <div className={b('price-section')}>
+            <label className={b('label')}>Цена</label>
+            <div className={b('slider-wrapper')}>
+              <div className={b('slider-badge', side)}>
                 {price}%
               </div>
+              <div className={b('slider-container')}>
+                <div className={b('slider-track')}>
+                  <div
+                    className={b('slider-fill', side)}
+                    style={{ width: `${price}%` }}
+                  />
+                </div>
+                <input
+                  type="range"
+                  className={b('slider', side)}
+                  value={price}
+                  onChange={handlePriceChange}
+                  min={MIN_PRICE}
+                  max={MAX_PRICE}
+                  step="1"
+                />
+              </div>
+              <div className={b('slider-labels')}>
+                <span>1%</span>
+                <span>50%</span>
+                <span>99%</span>
+              </div>
             </div>
-            <div className={b('slider-labels')}>
-              <span>1%</span>
-              <span>50%</span>
-              <span>99%</span>
-            </div>
-            {priceError && (
-              <span className={b('hint', 'error')}>{priceError}</span>
-            )}
           </div>
 
-          {/* Amount input */}
-          <div className={b('field')}>
-            <label className={b('label')} htmlFor="amount-input">
-              Сумма (₽)
-            </label>
-            <Input
-              id="amount-input"
-              type="number"
-              value={amount}
-              onChange={handleAmountChange}
-              min={MIN_AMOUNT}
-              step="10"
-              placeholder="100"
-            />
-            {amountError ? (
-              <span className={b('hint', 'error')}>{amountError}</span>
-            ) : (
-              <span className={b('hint')}>Минимум {MIN_AMOUNT} ₽</span>
-            )}
+          {/* Amount Input with Quick Buttons */}
+          <div className={b('amount-section')}>
+            <label className={b('label')}>Сумма</label>
+            <div className={b('amount-input-wrapper')}>
+              <span className={b('amount-icon')}>₽</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                className={b('amount-input')}
+                value={amount || ''}
+                onChange={handleAmountChange}
+                placeholder="100"
+              />
+            </div>
+            <div className={b('quick-amounts')}>
+              {QUICK_AMOUNTS.map(val => (
+                <button
+                  key={val}
+                  type="button"
+                  className={b('quick-btn')}
+                  onClick={() => handleQuickAmount(val)}
+                >
+                  +{val}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={b('quick-btn', 'max')}
+                onClick={handleMaxAmount}
+              >
+                MAX
+              </button>
+            </div>
+            <span className={b('amount-hint')}>Минимум {MIN_AMOUNT} ₽</span>
           </div>
 
-          {/* Potential profit display */}
-          {potentialProfit !== null && potentialProfit > 0 && (
-            <div className={b('profit')}>
-              При выигрыше: <span className={b('profit-value')}>+{potentialProfit.toFixed(2)} ₽</span>
+          {/* Profit Calculator Card */}
+          {isFormValid && potentialProfit > 0 && (
+            <div className={b('profit-card', side)}>
+              <div className={b('profit-main')}>
+                <span className={b('profit-label')}>При выигрыше</span>
+                <span className={b('profit-value')}>+{potentialProfit.toFixed(0)} ₽</span>
+                <span className={b('profit-chance')}>Шанс: {winChance}%</span>
+              </div>
+              <div className={b('profit-multiplier')}>
+                <span className={b('multiplier-value')}>x{multiplier.toFixed(2)}</span>
+              </div>
             </div>
           )}
 
@@ -260,19 +221,27 @@ export const BetPlacement: FC<BetPlacementProps> = ({ marketId, onSuccess }) => 
           {error && <div className={b('error')}>{error}</div>}
 
           {/* Success message */}
-          {success && <div className={b('success')}>✅ Ставка размещена!</div>}
+          {success && (
+            <div className={b('success')}>
+              Ставка размещена!
+            </div>
+          )}
 
-          {/* Submit button */}
-          <Button
-            className={b('submit')}
-            size="l"
-            stretched
-            loading={loading}
-            disabled={!isFormValid || loading}
+          {/* Submit Button */}
+          <button
+            type="button"
+            className={b('submit', { [side]: true, disabled: !isFormValid || loading })}
             onClick={handleSubmit}
+            disabled={!isFormValid || loading}
           >
-            Разместить ставку
-          </Button>
+            {loading ? (
+              <span className={b('submit-loading')}>Размещение...</span>
+            ) : (
+              <>
+                Поставить {amount} ₽ на {side === 'yes' ? 'ДА' : 'НЕТ'}
+              </>
+            )}
+          </button>
         </div>
       </Section>
     </div>
