@@ -231,6 +231,35 @@ async def get_markets(request: Request, db: Session = Depends(get_db)) -> List[D
     ]
 
 
+@app.get("/markets/{market_id}")
+@limiter.limit("60/minute")
+async def get_market(
+    request: Request,
+    market_id: int,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Get a single market by ID
+    """
+    from app.core.exceptions import MarketNotFoundException
+    market = db.query(Market).filter(Market.id == market_id).first()
+    if not market:
+        raise MarketNotFoundException(market_id)
+
+    return {
+        "id": market.id,
+        "title": market.title,
+        "description": market.description,
+        "deadline": market.deadline.isoformat(),
+        "resolved": market.resolved,
+        "outcome": market.outcome,
+        "yes_price": market.yes_price_decimal,
+        "no_price": market.no_price_decimal,
+        "volume": market.volume_rubles,
+        "category": market.category,
+    }
+
+
 @app.get("/markets/{market_id}/orderbook")
 @limiter.limit("60/minute")
 async def get_orderbook(
