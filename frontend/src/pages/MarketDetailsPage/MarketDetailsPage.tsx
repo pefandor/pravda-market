@@ -10,40 +10,36 @@ import { getMarket, getOrderbook } from '@/services/markets';
 import { Orderbook } from '@/components/Orderbook';
 import { BetPlacement } from '@/components/BetPlacement';
 import { Page } from '@/components/Page';
-import { formatDeadlineFull, formatCurrency } from '@/utils/formatting';
+import { formatCurrency } from '@/utils/formatting';
 import { sanitizeText } from '@/utils/sanitize';
 import { useCountdown } from '@/utils/useCountdown';
 
 import './MarketDetailsPage.css';
 
-// Aliases for consistent naming
-const formatDeadline = formatDeadlineFull;
+// Alias for consistent naming
 const formatVolume = formatCurrency;
 
 /**
- * CountdownCell - displays deadline with live countdown timer
+ * HeroCountdown - standalone countdown for hero section
  */
-const CountdownCell: FC<{ deadline: string }> = ({ deadline }) => {
+const HeroCountdown: FC<{ deadline: string }> = ({ deadline }) => {
   const countdown = useCountdown(deadline);
 
   return (
-    <Cell subtitle="Дедлайн" multiline>
-      <div className="market-details-page__deadline">
-        <span className="market-details-page__deadline-date">
-          {formatDeadline(deadline)}
-        </span>
-        <span
-          className={`market-details-page__countdown ${
-            countdown.isExpired ? 'market-details-page__countdown--expired' :
-            countdown.isUrgent ? 'market-details-page__countdown--urgent' : ''
-          }`}
-        >
-          {countdown.isExpired ? 'Завершён' : countdown.formatted}
-        </span>
-      </div>
-    </Cell>
+    <div className="market-details-page__hero-countdown">
+      <span className="market-details-page__hero-countdown-label">До завершения</span>
+      <span
+        className={`market-details-page__hero-countdown-value ${
+          countdown.isExpired ? 'market-details-page__hero-countdown-value--expired' :
+          countdown.isUrgent ? 'market-details-page__hero-countdown-value--urgent' : ''
+        }`}
+      >
+        {countdown.isExpired ? 'Завершён' : countdown.formatted}
+      </span>
+    </div>
   );
 };
+
 
 export const MarketDetailsPage: FC = () => {
   const { marketId } = useParams<{ marketId: string }>();
@@ -146,9 +142,30 @@ export const MarketDetailsPage: FC = () => {
     );
   }
 
+  // Format price as percentage
+  const formatPercent = (price: number) => `${(price * 100).toFixed(0)}%`;
+
   return (
     <Page>
       <div className="market-details-page">
+        {/* Hero Section with Prices */}
+        <div className="market-details-page__hero">
+          <div className="market-details-page__hero-prices">
+            <div className="market-details-page__hero-price market-details-page__hero-price--yes">
+              <span className="market-details-page__hero-label">ДА</span>
+              <span className="market-details-page__hero-value">{formatPercent(market.yes_price)}</span>
+            </div>
+            <div className="market-details-page__hero-divider">
+              <span className="market-details-page__hero-vs">VS</span>
+            </div>
+            <div className="market-details-page__hero-price market-details-page__hero-price--no">
+              <span className="market-details-page__hero-label">НЕТ</span>
+              <span className="market-details-page__hero-value">{formatPercent(market.no_price)}</span>
+            </div>
+          </div>
+          <HeroCountdown deadline={market.deadline} />
+        </div>
+
         {/* Market Header */}
         <Section>
           <div className="market-details-page__header">
@@ -173,7 +190,6 @@ export const MarketDetailsPage: FC = () => {
 
           {/* Market Info */}
           <div className="market-details-page__info">
-            <CountdownCell deadline={market.deadline} />
             {market.volume > 0 && (
               <Cell
                 subtitle="Объем торгов"

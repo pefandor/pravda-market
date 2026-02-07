@@ -22,6 +22,153 @@
   font-weight: 500;
 }
 
+/* ========================================
+   HERO SECTION - Big Price Display
+   ======================================== */
+
+.market-details-page__hero {
+  margin: 0 16px 20px;
+  padding: 24px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--pm-radius-xl, 20px);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative background elements */
+.market-details-page__hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -20%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.market-details-page__hero::after {
+  content: '';
+  position: absolute;
+  bottom: -50%;
+  right: -20%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.market-details-page__hero-prices {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 20px;
+}
+
+.market-details-page__hero-price {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.market-details-page__hero-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 14px;
+  border-radius: var(--pm-radius-full, 9999px);
+}
+
+.market-details-page__hero-price--yes .market-details-page__hero-label {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--pm-yes-color, #10B981);
+}
+
+.market-details-page__hero-price--no .market-details-page__hero-label {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--pm-no-color, #EF4444);
+}
+
+.market-details-page__hero-value {
+  font-size: 48px;
+  font-weight: 900;
+  font-family: var(--pm-font-mono, 'SF Mono', monospace);
+  line-height: 1;
+}
+
+.market-details-page__hero-price--yes .market-details-page__hero-value {
+  color: var(--pm-yes-color, #10B981);
+  text-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+}
+
+.market-details-page__hero-price--no .market-details-page__hero-value {
+  color: var(--pm-no-color, #EF4444);
+  text-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+}
+
+.market-details-page__hero-divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.market-details-page__hero-vs {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--tg-theme-hint-color);
+  opacity: 0.6;
+  letter-spacing: 2px;
+}
+
+/* Hero Countdown */
+.market-details-page__hero-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.market-details-page__hero-countdown-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--tg-theme-hint-color);
+  opacity: 0.8;
+}
+
+.market-details-page__hero-countdown-value {
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--pm-accent, #6366f1);
+  letter-spacing: 1px;
+  text-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+.market-details-page__hero-countdown-value--urgent {
+  color: #ef4444;
+  animation: pm-pulse 1s ease-in-out infinite;
+  text-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+.market-details-page__hero-countdown-value--expired {
+  color: var(--tg-theme-hint-color);
+  font-weight: 600;
+  text-shadow: none;
+}
+
 /* ----- Header ----- */
 .market-details-page__header {
   padding: 24px 16px 16px;

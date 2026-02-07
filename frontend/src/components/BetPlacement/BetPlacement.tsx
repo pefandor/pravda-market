@@ -192,25 +192,39 @@ export const BetPlacement: FC<BetPlacementProps> = ({ marketId, onSuccess }) => 
             </div>
           </div>
 
-          {/* Price input */}
+          {/* Price slider */}
           <div className={b('field')}>
             <label className={b('label')} htmlFor="price-input">
-              Цена (%)
+              Цена
             </label>
-            <Input
-              id="price-input"
-              type="number"
-              value={price}
-              onChange={handlePriceChange}
-              min={MIN_PRICE}
-              max={MAX_PRICE}
-              step="1"
-              placeholder="50"
-            />
-            {priceError ? (
+            <div className={b('slider-container')}>
+              <div className={b('slider-track')}>
+                <div
+                  className={b('slider-fill', side)}
+                  style={{ width: `${parseFloat(price) || 50}%` }}
+                />
+              </div>
+              <input
+                id="price-input"
+                type="range"
+                className={b('slider')}
+                value={price}
+                onChange={handlePriceChange}
+                min={MIN_PRICE}
+                max={MAX_PRICE}
+                step="1"
+              />
+              <div className={b('slider-value', side)}>
+                {price}%
+              </div>
+            </div>
+            <div className={b('slider-labels')}>
+              <span>1%</span>
+              <span>50%</span>
+              <span>99%</span>
+            </div>
+            {priceError && (
               <span className={b('hint', 'error')}>{priceError}</span>
-            ) : (
-              <span className={b('hint')}>Вероятность события (1-99%)</span>
             )}
           </div>
 
